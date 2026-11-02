@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { Link, useNavigate } from "react-router";
 import PalmCamera from "../components/PalmCamera.jsx";
+import ProcessingPanel from "../components/ProcessingPanel.jsx";
 import { scan } from "../lib/api.js";
 
 const BATAS_DEFAULT = 0.38;
@@ -18,6 +19,7 @@ export default function Scan() {
   const navigate = useNavigate();
   const [batas, setBatas] = useState(batasTersimpan);
   const [memproses, setMemproses] = useState(false);
+  const [foto, setFoto] = useState(null);
   const [galat, setGalat] = useState(null);
 
   function ubahBatas(e) {
@@ -31,6 +33,7 @@ export default function Scan() {
   }
 
   async function onAmbil(frame) {
+    setFoto(frame);
     setMemproses(true);
     setGalat(null);
     try {
@@ -49,23 +52,36 @@ export default function Scan() {
           <h1 className="text-xl font-semibold">Scan telapak</h1>
           <p className="text-sm text-slate-600">Letakkan telapak di dalam kamera. Foto diambil otomatis.</p>
         </div>
-        <label className="flex items-center gap-3 text-sm">
-          <span className="whitespace-nowrap">Batas {batas.toFixed(2)}</span>
-          <input
-            type="range"
-            min="0.1"
-            max="0.5"
-            step="0.01"
-            value={batas}
-            onChange={ubahBatas}
-            className="w-40"
-          />
-        </label>
+        <div className="text-sm">
+          <label className="flex items-center gap-3">
+            <span className="whitespace-nowrap">Batas kecocokan {batas.toFixed(2)}</span>
+            <input
+              type="range"
+              min="0.1"
+              max="0.5"
+              step="0.01"
+              value={batas}
+              onChange={ubahBatas}
+              className="w-40"
+            />
+          </label>
+          <p className="mt-1 max-w-xs text-xs text-slate-500">
+            Dikenali jika jarak terkecil di bawah batas. Lebih kecil = lebih ketat.
+          </p>
+        </div>
       </div>
 
-      <PalmCamera mode="sekali" onAmbil={onAmbil} aktif={!memproses} />
-
-      {memproses && <p className="text-sm text-slate-600">Memproses…</p>}
+      {/* Keep the camera mounted (hidden) so it does not reload the model after an error. */}
+      <div className={memproses ? "hidden" : ""}>
+        <PalmCamera mode="sekali" onAmbil={onAmbil} aktif={!memproses} />
+      </div>
+      {memproses && (
+        <ProcessingPanel
+          foto={foto}
+          judul="Memproses foto…"
+          keterangan="Foto sudah diambil. Tangan boleh diturunkan."
+        />
+      )}
       {galat && (
         <p className="rounded-lg bg-red-50 p-3 text-sm text-red-700">
           {galat}{" "}

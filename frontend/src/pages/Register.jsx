@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { Link } from "react-router";
 import PalmCamera from "../components/PalmCamera.jsx";
+import ProcessingPanel from "../components/ProcessingPanel.jsx";
 import { daftarOrang, sampel, simpanOrang } from "../lib/api.js";
 
 const JUMLAH = 8;
@@ -141,12 +142,17 @@ export default function Register() {
             Batal
           </button>
         </div>
-        <PalmCamera
-          mode="beruntun"
-          onAmbil={onAmbil}
-          aktif={!menyimpan && !gagalSimpan && jumlah < JUMLAH}
-        />
-        {menyimpan && <p className="text-sm text-slate-600">Menyimpan…</p>}
+        {/* The hand must stay in view for all 8 samples; once saving starts it is no longer needed. */}
+        <div className={menyimpan ? "hidden" : ""}>
+          <PalmCamera
+            mode="beruntun"
+            onAmbil={onAmbil}
+            aktif={!menyimpan && !gagalSimpan && jumlah < JUMLAH}
+          />
+        </div>
+        {menyimpan && (
+          <ProcessingPanel judul="Menyimpan data…" keterangan="8 sampel sudah diambil. Tangan boleh diturunkan." />
+        )}
         {pesan && <p className="text-sm text-orange-700">{pesan}</p>}
         {galat && (
           <div className="flex flex-wrap items-center gap-3 rounded-lg bg-red-50 p-3 text-sm text-red-700">
