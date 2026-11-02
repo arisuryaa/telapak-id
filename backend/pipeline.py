@@ -55,8 +55,10 @@ def _catat(a):
     if a.lm is not None:
         bagian.append(f"label={a.label} sisi={a.sisi} silang={silang_telapak(a.lm, w, h):.0f}")
     if a.roi_detail is not None:
-        terang, tajam = ukur_roi(a.roi_detail["roi"])
-        bagian.append(f"roi_terang={terang:.1f} roi_tajam={tajam:.1f}")
+        roi = a.roi_detail["roi"]
+        terang, tajam = ukur_roi(roi)
+        terpotong = 100 * float((roi >= 250).mean())
+        bagian.append(f"roi_terang={terang:.1f} roi_terpotong={terpotong:.0f}% roi_tajam={tajam:.1f}")
     bagian.append(f"hasil=gagal: {a.gagal}" if a.gagal else "hasil=lolos")
     log.info("analisis %s", " ".join(bagian))
 

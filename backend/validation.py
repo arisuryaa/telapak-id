@@ -4,8 +4,10 @@ import numpy as np
 
 import palm
 
+# terpotong_maks: largest share of ROI pixels clipped to white (>= 250) before the
+# palm lines are considered washed out. Bright but unclipped palms still have lines.
 AMBANG = {"rasio_jari": 1.1, "rasio_jempol": 0.7,
-          "terang_min": 40, "terang_max": 215, "tajam_min": 20.0}
+          "terang_min": 40, "terpotong_maks": 0.4, "tajam_min": 20.0}
 
 # (fingertip, PIP joint) for index, middle, ring, little finger
 PASANGAN_JARI = [(8, 6), (12, 10), (16, 14), (20, 18)]
@@ -68,7 +70,7 @@ def kualitas_roi(roi):
     terang, tajam = ukur_roi(roi)
     if terang < AMBANG["terang_min"]:
         return "Foto terlalu gelap, tambah cahaya"
-    if terang > AMBANG["terang_max"]:
+    if float((roi >= 250).mean()) > AMBANG["terpotong_maks"]:
         return "Foto terlalu terang"
     if tajam < AMBANG["tajam_min"]:
         return "Foto kurang jelas, tahan tangan lebih diam"

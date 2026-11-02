@@ -96,7 +96,7 @@ Dicek dua kali: di browser (untuk panduan langsung) dan di server (sebelum penge
 | Telapak menghadap kamera | Arah perkalian silang pergelangan–telunjuk dan pergelangan–kelingking sesuai sisi tangan. Ini yang menolak punggung tangan. |
 | Jarak pas | Lebar telapak dalam rentang tertentu dan kotak area tidak keluar dari gambar |
 | Tangan diam | Pergeseran titik tangan antar frame kecil |
-| Kualitas ROI | Kecerahan dan ketajaman dalam batas wajar, di server |
+| Kualitas ROI | Di server: tidak terlalu gelap (rata-rata ≥ 40), tidak lebih dari 40% piksel terpotong putih, dan cukup tajam setelah CLAHE (≥ 20) |
 
 ## 7. Bagaimana sistem membedakan orang
 
@@ -118,7 +118,7 @@ Skala jarak: 0 = identik, sekitar 0,5 = pola acak. Batas yang baik **harus diset
 ### Log untuk debugging
 
 - **Terminal backend** (`python app.py`): satu baris per foto yang dianalisis, misalnya
-  `analisis frame=1280x720 tahap=7 label=Left sisi=kanan silang=-10080 roi_terang=127.7 roi_tajam=36.0 hasil=lolos`,
+  `analisis frame=1280x720 tahap=7 label=Left sisi=kanan silang=-10080 roi_terang=127.7 roi_terpotong=0% roi_tajam=36.0 hasil=lolos`,
   lalu ringkasan `scan: ...`, `sampel: ...`, `tersimpan: ...`. Permintaan yang ditolak muncul sebagai `WARNING`.
 - **Console browser** (F12 → Console, filter `[Telapak]`): perubahan status tangan (label, sisi, silang, tiap syarat), foto yang diambil, dan setiap panggilan API beserta durasinya.
 - **Panel "Info teknis"** di bawah syarat foto: label, sisi, dan nilai silang secara langsung.

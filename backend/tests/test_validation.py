@@ -62,3 +62,16 @@ def test_telapak_buram_ditolak():
     import cv2
     buram = cv2.GaussianBlur(roi_telapak_halus(), (0, 0), 3)
     assert kualitas_roi(buram) == "Foto kurang jelas, tahan tangan lebih diam"
+
+
+def test_telapak_terang_tanpa_terpotong_lolos():
+    # Bright lighting (mean ~220) with no clipped pixels still shows the lines.
+    terang = np.clip(roi_telapak_halus().astype(np.int16) + 45, 0, 255).astype(np.uint8)
+    assert terang.mean() > 215 and (terang >= 250).mean() < 0.05
+    assert kualitas_roi(terang) is None
+
+
+def test_telapak_terpotong_putih_ditolak():
+    # Overexposed: most pixels are clipped to white and the lines are gone.
+    roi = roi_telapak_halus().astype(np.int16) + 120
+    assert kualitas_roi(np.clip(roi, 0, 255).astype(np.uint8)) == "Foto terlalu terang"
