@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { Link } from "react-router";
 import { daftarOrang, hapusOrang, hapusSemua } from "../lib/api.js";
+import { formatTangan } from "../lib/format.js";
 
 export default function RegisteredData() {
   const [daftar, setDaftar] = useState(null);
@@ -85,7 +86,7 @@ export default function RegisteredData() {
                   </td>
                   <td className="px-4 py-2">{o.umur}</td>
                   <td className="px-4 py-2 capitalize">{o.status}</td>
-                  <td className="px-4 py-2">{o.tangan.join(", ")}</td>
+                  <td className="px-4 py-2">{formatTangan(o)}</td>
                   <td className="px-4 py-2">
                     {new Date(o.dibuat_pada).toLocaleDateString("id-ID", {
                       day: "numeric", month: "long", year: "numeric",

@@ -82,6 +82,16 @@ Pengelompokan untuk laporan: tahap 2–4 = *preprocessing*, tahap 5–6 = *featu
 
 Gambar pada halaman hasil adalah **data yang sama** dengan yang dipakai untuk mencocokkan, bukan ilustrasi. Hanya tahap 1–3 yang ditampilkan dengan frame penuh, sisanya berukuran 128×128.
 
+### Ukuran kotak ROI (`ROI_SKALA`)
+
+Kotak jurnal (1,0×) adalah persegi selebar telapak (jarak pangkal telunjuk ke pangkal kelingking), dimulai 0,15× lebar di bawah garis pangkal jari. Kotak ini hanya mengambil tengah telapak, karena tepi telapak (pangkal ibu jari, pergelangan) bentuknya berubah-ubah antar foto.
+
+Untuk perbandingan, ukuran kotak bisa diubah di `backend/.env`, misalnya `ROI_SKALA=1.3`. Kotak diperbesar merata di sekitar titik tengah yang sama. Rentang yang diizinkan 0,8–1,5; di atas 1,5 kotak keluar dari telapak dan ikut mengambil latar belakang.
+
+- Setiap tangan menyimpan ukuran kotak yang dipakai saat mendaftar. Scan hanya membandingkan dengan data yang ukurannya sama, karena kode dari ukuran berbeda tidak bisa dibandingkan.
+- Setelah mengubah `ROI_SKALA`, restart backend dan daftar ulang (pilih orangnya, lalu setujui penggantian).
+- Halaman *Data terdaftar* menampilkan ukuran kotak setiap tangan, misalnya `kanan (1.3×)`.
+
 ### Kenapa tidak memakai Canny?
 Canny mencari tepi, sehingga satu garis tipis sering terbelah menjadi dua tepi sejajar, dan hasilnya hanya "ada tepi / tidak" tanpa informasi **arah**. Filter Gabor menghasilkan arah garis di tiap titik, yang dipakai untuk pencocokan, dan sesuai dengan metode di jurnal palmprint.
 

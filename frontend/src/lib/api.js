@@ -28,6 +28,8 @@ async function kirim(path, opsi = {}) {
   return data;
 }
 
+export const ambilPengaturan = () => kirim("/api/pengaturan");
+
 export const scan = (frame, batas) =>
   kirim("/api/scan", { method: "POST", body: JSON.stringify({ frame, batas }) });
 

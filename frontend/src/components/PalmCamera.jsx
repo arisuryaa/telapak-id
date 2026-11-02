@@ -3,6 +3,7 @@ import { HandLandmarker } from "@mediapipe/tasks-vision";
 import { useHandTracker } from "../hooks/useHandTracker.js";
 import { AMBANG, kotakRoi, periksa } from "../lib/validation.js";
 import { log, logGalat } from "../lib/log.js";
+import { ambilPengaturan } from "../lib/api.js";
 
 const tanda = (ok) => (ok ? "✔" : "✖");
 
@@ -25,6 +26,7 @@ export default function PalmCamera({ mode = "sekali", onAmbil, aktif = true }) {
   const [kameraGalat, setKameraGalat] = useState(null);
   const [status, setStatus] = useState(() => periksa(null, null, null, 640, 480));
   const [sibuk, setSibuk] = useState(false);
+  const [roiSkala, setRoiSkala] = useState(1);
 
   const prevLm = useRef(null);
   const kunciLogTerakhir = useRef("");
@@ -38,6 +40,13 @@ export default function PalmCamera({ mode = "sekali", onAmbil, aktif = true }) {
     onAmbilRef.current = onAmbil;
     modeRef.current = mode;
   }, [onAmbil, mode]);
+
+  // The server decides the ROI box size; draw and check the same box here.
+  useEffect(() => {
+    ambilPengaturan()
+      .then((p) => setRoiSkala(p.roi_skala))
+      .catch((err) => logGalat(`pengaturan gagal dimuat, memakai kotak 1×: ${err.message}`));
+  }, []);
 
   // Open the camera once; release it on unmount.
   useEffect(() => {
@@ -81,7 +90,7 @@ export default function PalmCamera({ mode = "sekali", onAmbil, aktif = true }) {
     const w = video?.videoWidth || 640;
     const h = video?.videoHeight || 480;
     const lm = hasil?.lm ?? null;
-    const p = periksa(lm, hasil?.label ?? null, prevLm.current, w, h);
+    const p = periksa(lm, hasil?.label ?? null, prevLm.current, w, h, roiSkala);
     prevLm.current = lm;
     setStatus(p);
 
@@ -122,7 +131,7 @@ export default function PalmCamera({ mode = "sekali", onAmbil, aktif = true }) {
           ctx.fill();
         }
         if (p.semua) {
-          const { titik } = kotakRoi(lm, w, h);
+          const { titik } = kotakRoi(lm, w, h, roiSkala);
           ctx.beginPath();
           titik.forEach(([x, y], i) => (i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y)));
           ctx.closePath();
@@ -161,7 +170,7 @@ export default function PalmCamera({ mode = "sekali", onAmbil, aktif = true }) {
           berikutnya.current = performance.now() + AMBANG.jedaMs;
         }
       });
-  }, [hasil, aktif, siap]);
+  }, [hasil, aktif, siap, roiSkala]);
 
   const galat = kameraGalat ?? galatModel;
   const pesan = !siap && !galat
@@ -215,6 +224,8 @@ export default function PalmCamera({ mode = "sekali", onAmbil, aktif = true }) {
             <dd>{status.sisi ?? "-"}</dd>
             <dt>silang</dt>
             <dd>{status.silang?.toFixed(0) ?? "-"}</dd>
+            <dt>kotak</dt>
+            <dd>{roiSkala}× lebar telapak</dd>
           </dl>
           <p className="mt-1">Tangan kanan: telapak jika silang &lt; 0. Tangan kiri: telapak jika silang &gt; 0.</p>
         </details>

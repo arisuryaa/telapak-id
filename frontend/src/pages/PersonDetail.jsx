@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { Link, useLocation, useParams } from "react-router";
 import { ambilOrang } from "../lib/api.js";
+import { formatTangan } from "../lib/format.js";
 
 export default function PersonDetail() {
   const { id } = useParams();
@@ -40,7 +41,7 @@ export default function PersonDetail() {
           <dt className="text-slate-500">Status</dt>
           <dd className="capitalize">{orang.status}</dd>
           <dt className="text-slate-500">Tangan terdaftar</dt>
-          <dd>{orang.tangan.join(", ")}</dd>
+          <dd>{formatTangan(orang)}</dd>
         </dl>
         {state?.sisi && (
           <p className="mt-5 rounded-lg bg-green-50 p-3 text-sm text-green-800">

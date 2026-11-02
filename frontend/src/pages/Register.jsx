@@ -3,6 +3,7 @@ import { Link } from "react-router";
 import PalmCamera from "../components/PalmCamera.jsx";
 import ProcessingPanel from "../components/ProcessingPanel.jsx";
 import { daftarOrang, sampel, simpanOrang } from "../lib/api.js";
+import { formatTangan } from "../lib/format.js";
 
 const JUMLAH = 8;
 const STATUS = [
@@ -182,7 +183,7 @@ export default function Register() {
           <option value="baru">Orang baru</option>
           {daftar.map((o) => (
             <option key={o.id} value={o.id}>
-              {o.nama} (sudah terdaftar: {o.tangan.join(", ")})
+              {o.nama} (sudah terdaftar: {formatTangan(o)})
             </option>
           ))}
         </select>
