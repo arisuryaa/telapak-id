@@ -4,3 +4,7 @@ body {
   background-color: #f1f5f9;
   color: #0f172a;
 }
+
+.pixelated {
+  image-rendering: pixelated;
+}
