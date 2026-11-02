@@ -89,10 +89,11 @@ export default function PalmCamera({ mode = "sekali", onAmbil, aktif = true }) {
         ctx.strokeStyle = warna;
         ctx.fillStyle = warna;
         ctx.lineWidth = 3;
-        for (const [a, b] of HandLandmarker.HAND_CONNECTIONS) {
+        // MediaPipe connections are objects: { start, end }, not pairs.
+        for (const { start, end } of HandLandmarker.HAND_CONNECTIONS) {
           ctx.beginPath();
-          ctx.moveTo(lm[a].x * w, lm[a].y * h);
-          ctx.lineTo(lm[b].x * w, lm[b].y * h);
+          ctx.moveTo(lm[start].x * w, lm[start].y * h);
+          ctx.lineTo(lm[end].x * w, lm[end].y * h);
           ctx.stroke();
         }
         for (const pt of lm) {
