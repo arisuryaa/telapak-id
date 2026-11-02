@@ -43,32 +43,32 @@ backend/
   .env.example
   requirements.txt
   palm.py            # inti CV (dipindah dari root, direfaktor: keluaran antara)
-  validasi.py        # aturan jari terbuka, arah telapak, sisi, kualitas ROI
+  validation.py        # aturan jari terbuka, arah telapak, sisi, kualitas ROI
   pipeline.py        # baca frame + analisis() berurutan, menandai tahap gagal
-  langkah.py         # susun 8 langkah (gambar data URL + angka + teks)
+  steps.py         # susun 8 langkah (gambar data URL + angka + teks)
   db.py              # model SQLAlchemy + fungsi data
   app.py             # Flask API
   tests/
-    fixtures/landmark_uji.json, roi_uji.npy, kode_asli.npy
-    test_palm.py test_validasi.py test_pipeline.py test_db.py test_app.py
+    fixtures/landmarks_test.json, roi_test.npy, code_golden.npy
+    test_palm.py test_validation.py test_pipeline.py test_db.py test_app.py
 frontend/
   package.json vite.config.js index.html
-  scripts/siapkan-mediapipe.mjs
+  scripts/prepare-mediapipe.mjs
   src/main.jsx App.jsx index.css
-  src/lib/validasi.js validasi.test.js api.js
+  src/lib/validation.js validation.test.js api.js
   src/hooks/useHandTracker.js
-  src/components/KameraTangan.jsx GrafikJarak.jsx
-  src/pages/Scan.jsx Hasil.jsx DetailOrang.jsx Daftar.jsx DataTerdaftar.jsx
+  src/components/PalmCamera.jsx DistanceChart.jsx
+  src/pages/Scan.jsx Result.jsx PersonDetail.jsx Register.jsx RegisteredData.jsx
 README.md
 ```
-Dihapus di Task 11: `palm.py` (root), `daftar.py`, `scan.py`, `hapus.py`, `requirements.txt` (root), `__pycache__/`.
+Dihapus di Task 11: `palm.py` (root), `register.py`, `scan.py`, `delete.py`, `requirements.txt` (root), `__pycache__/`.
 
 ---
 
 ### Task 1: Repo awal + refaktor `palm.py` ke `backend/`
 
 **Files:**
-- Create: `.gitignore`, `backend/palm.py`, `backend/requirements.txt`, `backend/tests/test_palm.py`, `backend/tests/fixtures/roi_uji.npy`, `backend/tests/fixtures/kode_asli.npy`
+- Create: `.gitignore`, `backend/palm.py`, `backend/requirements.txt`, `backend/tests/test_palm.py`, `backend/tests/fixtures/roi_test.npy`, `backend/tests/fixtures/code_golden.npy`
 
 **Interfaces:**
 - Produces (`backend/palm.py`):
@@ -79,13 +79,13 @@ Dihapus di Task 11: `palm.py` (root), `daftar.py`, `scan.py`, `hapus.py`, `requi
   - `hitung_kode_detail(roi_gray) -> dict` — kunci `clahe` (uint8 128×128, hasil CLAHE sebelum normalisasi), `respons` (float32 6×128×128), `kode` (uint8 128×128).
   - `hitung_kode(roi_gray) -> np.ndarray`, `jarak_kode(a, b, geser=3) -> float`, `jarak_ke_orang(kode, daftar_kode) -> float` — perilaku sama persis dengan versi lama.
 
-- [ ] **Step 1: Siapkan repo.** Buat `.gitignore` berisi `__pycache__/`, `*.pyc`, `node_modules/`, `frontend/dist/`, `frontend/public/mediapipe/`, `.env`, `data_terdaftar/`, `.superpowers/`, `.pytest_cache/`. Commit kode lama apa adanya di `master` (`git add .gitignore README.md *.py requirements.txt docs && git commit -m "chore: kode awal versi terminal"`), lalu `git checkout -b web`.
+- [ ] **Step 1: Siapkan repo.** Buat `.gitignore` berisi `__pycache__/`, `*.pyc`, `node_modules/`, `frontend/dist/`, `frontend/public/mediapipe/`, `.env`, `registered_data/`, `.superpowers/`, `.pytest_cache/`. Commit kode lama apa adanya di `master` (`git add .gitignore README.md *.py requirements.txt docs && git commit -m "chore: kode awal versi terminal"`), lalu `git checkout -b web`.
 
 - [ ] **Step 2: Buat fixture emas dari `palm.py` lama** (sebelum dipindah). Dari root repo:
 
 ```bash
 mkdir -p backend/tests/fixtures
-python -c "import numpy as np, cv2, palm; rng=np.random.default_rng(0); r=cv2.GaussianBlur(rng.integers(0,256,(128,128),dtype=np.uint8),(5,5),0); np.save('backend/tests/fixtures/roi_uji.npy', r); np.save('backend/tests/fixtures/kode_asli.npy', palm.hitung_kode(r))"
+python -c "import numpy as np, cv2, palm; rng=np.random.default_rng(0); r=cv2.GaussianBlur(rng.integers(0,256,(128,128),dtype=np.uint8),(5,5),0); np.save('backend/tests/fixtures/roi_test.npy', r); np.save('backend/tests/fixtures/code_golden.npy', palm.hitung_kode(r))"
 ```
 Expected: dua file `.npy` tercipta.
 
@@ -95,11 +95,11 @@ Expected: dua file `.npy` tercipta.
 FIX = Path(__file__).parent / "fixtures"
 
 def test_kode_sama_dengan_versi_lama():
-    roi = np.load(FIX / "roi_uji.npy")
-    assert np.array_equal(palm.hitung_kode(roi), np.load(FIX / "kode_asli.npy"))
+    roi = np.load(FIX / "roi_test.npy")
+    assert np.array_equal(palm.hitung_kode(roi), np.load(FIX / "code_golden.npy"))
 
 def test_kode_detail_konsisten():
-    roi = np.load(FIX / "roi_uji.npy")
+    roi = np.load(FIX / "roi_test.npy")
     d = palm.hitung_kode_detail(roi)
     assert d["respons"].shape == (6, 128, 128) and d["clahe"].dtype == np.uint8
     assert np.array_equal(d["kode"], palm.hitung_kode(roi))
@@ -112,7 +112,7 @@ def test_jarak_diri_nol_acak_setengah():
     assert 0.40 < palm.jarak_kode(a, b) < 0.55
 
 def test_roi_dari_landmark_tiruan():
-    # tangan kanan terbuka dari fixtures/landmark_uji.json dibuat di Task 2;
+    # tangan kanan terbuka dari fixtures/landmarks_test.json dibuat di Task 2;
     # di sini cukup titik 0, 5, 17 pada frame 640x480
     lm = titik_tiruan({0: (320, 420), 5: (360, 300), 17: (272, 312)}, 640, 480)
     d = palm.ambil_roi_detail(np.zeros((480, 640, 3), np.uint8), lm)
@@ -134,10 +134,10 @@ def test_roi_none_jika_terlalu_kecil():
 
 ---
 
-### Task 2: `validasi.py` — aturan tangan dan kualitas ROI
+### Task 2: `validation.py` — aturan tangan dan kualitas ROI
 
 **Files:**
-- Create: `backend/validasi.py`, `backend/tests/test_validasi.py`, `backend/tests/fixtures/landmark_uji.json`
+- Create: `backend/validation.py`, `backend/tests/test_validation.py`, `backend/tests/fixtures/landmarks_test.json`
 
 **Interfaces:**
 - Produces:
@@ -147,7 +147,7 @@ def test_roi_none_jika_terlalu_kecil():
   - `menghadap_kamera(lm, sisi: str, w: int, h: int) -> bool` — `z = cross(p5−p0, p17−p0)` (koordinat gambar, y ke bawah); telapak jika (`sisi=="kanan"` dan `z<0`) atau (`sisi=="kiri"` dan `z>0`).
   - `kualitas_roi(roi_gray) -> str | None` — `None` = lolos; rata-rata < `terang_min` → `"Foto terlalu gelap, tambah cahaya"`; > `terang_max` → `"Foto terlalu terang"`; `cv2.Laplacian(roi, cv2.CV_64F).var() < tajam_min` → `"Foto kurang jelas, tahan tangan lebih diam"`.
 
-- [ ] **Step 1: Buat fixture** `landmark_uji.json`: `{"lebar": 640, "tinggi": 480, "terbuka_kanan": [[x,y]×21], "kepal_kanan": [...], "punggung_kanan": [...]}` dalam piksel. `punggung_kanan` = `terbuka_kanan` dengan `x → 640 − x`.
+- [ ] **Step 1: Buat fixture** `landmarks_test.json`: `{"lebar": 640, "tinggi": 480, "terbuka_kanan": [[x,y]×21], "kepal_kanan": [...], "punggung_kanan": [...]}` dalam piksel. `punggung_kanan` = `terbuka_kanan` dengan `x → 640 − x`.
 
 | titik | terbuka_kanan | kepal_kanan |
 |---|---|---|
@@ -160,7 +160,7 @@ def test_roi_none_jika_terlalu_kecil():
 
 File ini juga dipakai tes frontend (Task 6).
 
-- [ ] **Step 2: Tulis tes yang gagal** `test_validasi.py` (helper memuat fixture menjadi list `SimpleNamespace(x=px/640, y=py/480)`):
+- [ ] **Step 2: Tulis tes yang gagal** `test_validation.py` (helper memuat fixture menjadi list `SimpleNamespace(x=px/640, y=py/480)`):
 
 ```python
 def test_sisi_dari_label():
@@ -181,20 +181,20 @@ def test_kualitas_roi():
     assert kualitas_roi(np.full((128, 128), 10, np.uint8)) == "Foto terlalu gelap, tambah cahaya"
     assert kualitas_roi(np.full((128, 128), 250, np.uint8)) == "Foto terlalu terang"
     assert kualitas_roi(np.full((128, 128), 128, np.uint8)) == "Foto kurang jelas, tahan tangan lebih diam"
-    assert kualitas_roi(np.load(FIX / "roi_uji.npy")) is None
+    assert kualitas_roi(np.load(FIX / "roi_test.npy")) is None
 ```
 
-- [ ] **Step 3: Jalankan** `python -m pytest tests/test_validasi.py -q` → FAIL (import).
-- [ ] **Step 4: Implementasi** `validasi.py` sesuai antarmuka.
-- [ ] **Step 5: Jalankan** → 5 passed. Jika `roi_uji.npy` gagal `tajam_min`, turunkan tes ke ROI bertekstur lain, bukan menaikkan ambang tanpa alasan.
+- [ ] **Step 3: Jalankan** `python -m pytest tests/test_validation.py -q` → FAIL (import).
+- [ ] **Step 4: Implementasi** `validation.py` sesuai antarmuka.
+- [ ] **Step 5: Jalankan** → 5 passed. Jika `roi_test.npy` gagal `tajam_min`, turunkan tes ke ROI bertekstur lain, bukan menaikkan ambang tanpa alasan.
 - [ ] **Step 6: Commit** `feat(backend): validasi jari terbuka, arah telapak, kualitas ROI`.
 
 ---
 
-### Task 3: `pipeline.py` + `langkah.py`
+### Task 3: `pipeline.py` + `steps.py`
 
 **Files:**
-- Create: `backend/pipeline.py`, `backend/langkah.py`, `backend/tests/test_pipeline.py`
+- Create: `backend/pipeline.py`, `backend/steps.py`, `backend/tests/test_pipeline.py`
 
 **Interfaces:**
 - Consumes: Task 1 `palm.*`, Task 2 `validasi.*`.
@@ -206,7 +206,7 @@ def test_kualitas_roi():
     2. `tahap=2`; `not jari_terbuka` → `"Buka semua jari"`; `not menghadap_kamera` → `"Tunjukkan telapak tangan, bukan punggung tangan"`; `ambil_roi_detail` None → `"Tangan terlalu dekat/jauh atau keluar dari bingkai"`
     3. `tahap=4`; `kualitas_roi` tidak None → pesan itu
     4. `tahap=7`; `kode_detail = hitung_kode_detail(roi)`
-- Produces (`langkah.py`):
+- Produces (`steps.py`):
   - `WARNA_KODE = ["#ef4444", "#f59e0b", "#22c55e", "#06b6d4", "#3b82f6", "#a855f7"]` (arah 0°…150°)
   - `ke_data_url(img: np.ndarray, fmt: str = ".png") -> str`
   - `susun_langkah(a: Analisis, jarak: list | None = None, batas: float | None = None) -> list[dict]` — tiap langkah `{"no", "judul", "penjelasan", "gambar": [{"label", "src"}], "angka": {str: str|number}}`; langkah 1..`a.tahap` (lewati 3 bila roi_detail None); langkah 8 hanya bila `jarak is not None`. Langkah 7 punya kunci tambahan `"legenda": [{"arah": "0°", "warna": "#ef4444"}, ...]`.
@@ -258,7 +258,7 @@ def test_lengkap_tujuh_langkah_dan_kode_jujur():
 ```
 
 - [ ] **Step 2: Jalankan** `python -m pytest tests/test_pipeline.py -q` → FAIL.
-- [ ] **Step 3: Implementasi** `pipeline.py` dan `langkah.py` sesuai antarmuka. Frame (langkah 1–3) di-encode JPEG kualitas 85; sisanya PNG.
+- [ ] **Step 3: Implementasi** `pipeline.py` dan `steps.py` sesuai antarmuka. Frame (langkah 1–3) di-encode JPEG kualitas 85; sisanya PNG.
 - [ ] **Step 4: Jalankan** → 6 passed; lalu `python -m pytest -q` → semua lolos.
 - [ ] **Step 5: Commit** `feat(backend): analisis bertahap dan gambar 8 langkah`.
 
@@ -372,24 +372,24 @@ Tulis assertion lengkap sesuai komentar.
 
 ---
 
-### Task 6: Kerangka frontend + `validasi.js`
+### Task 6: Kerangka frontend + `validation.js`
 
 **Files:**
-- Create: `frontend/` (Vite React), `frontend/vite.config.js`, `frontend/scripts/siapkan-mediapipe.mjs`, `frontend/src/index.css`, `frontend/src/App.jsx`, `frontend/src/main.jsx`, `frontend/src/lib/validasi.js`, `frontend/src/lib/validasi.test.js`, halaman kosong `frontend/src/pages/*.jsx`
+- Create: `frontend/` (Vite React), `frontend/vite.config.js`, `frontend/scripts/prepare-mediapipe.mjs`, `frontend/src/index.css`, `frontend/src/App.jsx`, `frontend/src/main.jsx`, `frontend/src/lib/validation.js`, `frontend/src/lib/validation.test.js`, halaman kosong `frontend/src/pages/*.jsx`
 
 **Interfaces:**
-- Consumes: `backend/tests/fixtures/landmark_uji.json` (impor JSON relatif di tes).
-- Produces (`src/lib/validasi.js`), paralel dengan Python:
+- Consumes: `backend/tests/fixtures/landmarks_test.json` (impor JSON relatif di tes).
+- Produces (`src/lib/validation.js`), paralel dengan Python:
   - `AMBANG = { rasioJari: 1.1, rasioJempol: 0.7, lebarMin: 0.12, lebarMax: 0.45, gerakMax: 0.012, tahanMs: 1000, jedaMs: 800 }`
   - `sisiDariLabel(label) -> "kanan"|"kiri"`, `jariTerbuka(lm, w, h) -> bool`, `menghadapKamera(lm, sisi, w, h) -> bool` (rumus sama dengan Task 2)
   - `kotakRoi(lm, w, h) -> { titik: [[x,y]×4], didalam: bool }` — geometri `palm.ambil_roi` di frame asli: `c=(p5+p17)/2`, `s=|p17−p5|`, `u=(p17−p5)/s`, `n` tegak lurus `u` mengarah ke p0; sudut = `c ± u·s/2 + n·0.15s` dan `c ± u·s/2 + n·1.15s`; `didalam` = keempat sudut di dalam [0,w]×[0,h]. (Pendekatan; server tetap penentu.)
   - `rataGerak(lmA, lmB) -> number` (rata-rata jarak ternormalisasi 21 titik; `Infinity` jika `lmB` null)
   - `periksa(lm, label, lmSebelum, w, h) -> { terdeteksi, jari, menghadap, jarak, diam, semua, sisi, pesan }` — `jarak` = lebar |5−17|/w di [lebarMin, lebarMax] **dan** `kotakRoi.didalam`. `pesan` sesuai butir gagal pertama: "Letakkan telapak di depan kamera" · "Buka semua jari" · "Tunjukkan telapak tangan, bukan punggung tangan" · "Atur jarak tangan ke kamera" · "Tahan tangan agar diam" · (semua lolos) "Tahan..."
 
-- [ ] **Step 1: Buat proyek.** `npm create vite@latest frontend -- --template react`, lalu di `frontend/`: `npm i react-router@7 @mediapipe/tasks-vision@0.10.21` dan `npm i -D tailwindcss@4 @tailwindcss/vite@4 vitest`. `vite.config.js`: plugin `react()` + `tailwindcss()`, `server.proxy = { "/api": "http://127.0.0.1:5000" }`, `test.environment = "node"`. `index.css`: `@import "tailwindcss";`. Script `package.json`: `"test": "vitest run"`, `"siapkan-mediapipe": "node scripts/siapkan-mediapipe.mjs"`, `"postinstall": "node scripts/siapkan-mediapipe.mjs"`.
-- [ ] **Step 2: `siapkan-mediapipe.mjs`** menyalin `node_modules/@mediapipe/tasks-vision/wasm/*` ke `public/mediapipe/wasm/` dan mengunduh `https://storage.googleapis.com/mediapipe-models/hand_landmarker/hand_landmarker/float16/1/hand_landmarker.task` ke `public/mediapipe/hand_landmarker.task` bila belum ada. Jalankan `npm run siapkan-mediapipe` → kedua aset ada.
+- [ ] **Step 1: Buat proyek.** `npm create vite@latest frontend -- --template react`, lalu di `frontend/`: `npm i react-router@7 @mediapipe/tasks-vision@0.10.21` dan `npm i -D tailwindcss@4 @tailwindcss/vite@4 vitest`. `vite.config.js`: plugin `react()` + `tailwindcss()`, `server.proxy = { "/api": "http://127.0.0.1:5000" }`, `test.environment = "node"`. `index.css`: `@import "tailwindcss";`. Script `package.json`: `"test": "vitest run"`, `"prepare-mediapipe": "node scripts/prepare-mediapipe.mjs"`, `"postinstall": "node scripts/prepare-mediapipe.mjs"`.
+- [ ] **Step 2: `prepare-mediapipe.mjs`** menyalin `node_modules/@mediapipe/tasks-vision/wasm/*` ke `public/mediapipe/wasm/` dan mengunduh `https://storage.googleapis.com/mediapipe-models/hand_landmarker/hand_landmarker/float16/1/hand_landmarker.task` ke `public/mediapipe/hand_landmarker.task` bila belum ada. Jalankan `npm run prepare-mediapipe` → kedua aset ada.
 - [ ] **Step 3: `App.jsx`**: `BrowserRouter` dengan navigasi atas "Scan · Daftar · Data terdaftar" (`NavLink`) dan rute `/` Scan, `/hasil` Hasil, `/orang/:id` DetailOrang, `/daftar` Daftar, `/data` DataTerdaftar (halaman sementara berisi judul).
-- [ ] **Step 4: Tulis tes yang gagal** `validasi.test.js` dengan fixture yang sama (dinormalisasi /640, /480):
+- [ ] **Step 4: Tulis tes yang gagal** `validation.test.js` dengan fixture yang sama (dinormalisasi /640, /480):
 
 ```js
 test("label → sisi", () => { expect(sisiDariLabel("Left")).toBe("kanan"); expect(sisiDariLabel("Right")).toBe("kiri") })
@@ -413,7 +413,7 @@ test("tanpa tangan", () => { expect(periksa(null, null, null, 640, 480).pesan).t
 ```
 Catatan: kotak ROI `terbuka_kanan` (s≈89, ke bawah 1.15s≈102 dari y≈306) harus di dalam 640×480 dan lebar 89/640≈0.139 ∈ [0.12, 0.45].
 
-- [ ] **Step 5: Jalankan** `npm test` → FAIL; implementasi `validasi.js`; `npm test` → 6 passed; `npm run build` → sukses.
+- [ ] **Step 5: Jalankan** `npm test` → FAIL; implementasi `validation.js`; `npm test` → 6 passed; `npm run build` → sukses.
 - [ ] **Step 6: Commit** `feat(frontend): kerangka React/Tailwind dan aturan validasi`.
 
 ---
@@ -421,18 +421,18 @@ Catatan: kotak ROI `terbuka_kanan` (s≈89, ke bawah 1.15s≈102 dari y≈306) h
 ### Task 7: Kamera berpanduan + halaman Scan
 
 **Files:**
-- Create: `frontend/src/hooks/useHandTracker.js`, `frontend/src/components/KameraTangan.jsx`, `frontend/src/lib/api.js`
+- Create: `frontend/src/hooks/useHandTracker.js`, `frontend/src/components/PalmCamera.jsx`, `frontend/src/lib/api.js`
 - Modify: `frontend/src/pages/Scan.jsx`
 
 **Interfaces:**
-- Consumes: Task 6 `validasi.js`; API Task 5.
+- Consumes: Task 6 `validation.js`; API Task 5.
 - Produces:
   - `useHandTracker(videoRef) -> { hasil: { lm, label } | null, fps: number, siap: boolean, galat: string | null }` — `FilesetResolver.forVisionTasks("/mediapipe/wasm")`, `HandLandmarker.createFromOptions({ baseOptions: { modelAssetPath: "/mediapipe/hand_landmarker.task", delegate: "GPU" }, runningMode: "VIDEO", numHands: 1 })`, loop `requestAnimationFrame` + `detectForVideo`; `fps` = jumlah deteksi per detik terakhir, diperbarui tiap 0,5 s.
-  - `<KameraTangan mode="sekali"|"beruntun" onAmbil={async (frameDataUrl, info) => …} aktif={bool} />` — `info = { sisi }`. Overlay canvas berukuran sama dengan video, keduanya dicermin CSS. Kerangka (`HandLandmarker.HAND_CONNECTIONS`) hijau bila `periksa().semua`, merah bila tidak; poligon `kotakRoi` hanya saat semua lolos. Badge FPS kanan atas, pil pesan di bawah video, daftar 5 butir validasi (✔/✖) di samping. Tanpa tangan → video polos + pesan. Ambil frame: `semua` bertahan `AMBANG.tahanMs` → gambar video ke canvas tersembunyi (tidak dicermin) → `toDataURL("image/jpeg", 0.92)` → `onAmbil`. `mode="sekali"`: berhenti setelah satu ambilan. `mode="beruntun"`: ambil lagi tiap `AMBANG.jedaMs` selama valid, menunggu `onAmbil` selesai dulu. `aktif=false` menghentikan pengambilan. Kamera: `getUserMedia({ video: { width: { ideal: 1280 }, height: { ideal: 720 }, facingMode: "user" } })`; dilepas saat unmount.
+  - `<PalmCamera mode="sekali"|"beruntun" onAmbil={async (frameDataUrl, info) => …} aktif={bool} />` — `info = { sisi }`. Overlay canvas berukuran sama dengan video, keduanya dicermin CSS. Kerangka (`HandLandmarker.HAND_CONNECTIONS`) hijau bila `periksa().semua`, merah bila tidak; poligon `kotakRoi` hanya saat semua lolos. Badge FPS kanan atas, pil pesan di bawah video, daftar 5 butir validasi (✔/✖) di samping. Tanpa tangan → video polos + pesan. Ambil frame: `semua` bertahan `AMBANG.tahanMs` → gambar video ke canvas tersembunyi (tidak dicermin) → `toDataURL("image/jpeg", 0.92)` → `onAmbil`. `mode="sekali"`: berhenti setelah satu ambilan. `mode="beruntun"`: ambil lagi tiap `AMBANG.jedaMs` selama valid, menunggu `onAmbil` selesai dulu. `aktif=false` menghentikan pengambilan. Kamera: `getUserMedia({ video: { width: { ideal: 1280 }, height: { ideal: 720 }, facingMode: "user" } })`; dilepas saat unmount.
   - `api.js`: `scan(frame, batas)`, `sampel(frame)`, `simpanOrang(body)`, `daftarOrang()`, `ambilOrang(id)`, `hapusOrang(id)`, `hapusSemua()` — melempar `Error(pesan)` dengan `err.status` dan `err.data` saat respons tidak OK.
-  - `Scan.jsx`: `KameraTangan mode="sekali"`; slider batas 0.10–0.50 langkah 0.01, default 0.38, tersimpan di `localStorage["batas"]` (dalam try/catch). Setelah `onAmbil` → indikator "Memproses…" → `scan()` → `navigate("/hasil", { state: { hasil } })`. Galat API → tampilkan pesan + kamera aktif lagi.
+  - `Scan.jsx`: `PalmCamera mode="sekali"`; slider batas 0.10–0.50 langkah 0.01, default 0.38, tersimpan di `localStorage["batas"]` (dalam try/catch). Setelah `onAmbil` → indikator "Memproses…" → `scan()` → `navigate("/hasil", { state: { hasil } })`. Galat API → tampilkan pesan + kamera aktif lagi.
 
-- [ ] **Step 1: Implementasi** `api.js`, `useHandTracker.js`, `KameraTangan.jsx`, `Scan.jsx`.
+- [ ] **Step 1: Implementasi** `api.js`, `useHandTracker.js`, `PalmCamera.jsx`, `Scan.jsx`.
 - [ ] **Step 2: `npm run build`** → sukses; `npm test` → tetap lolos.
 - [ ] **Step 3: Jalankan** `python app.py` (MySQL Laragon menyala) dan `npm run dev`, buka `http://localhost:5173`.
 - [ ] **Step 4: Cek manual:** FPS tampil (≥15 di laptop); tangan terbuka → kerangka hijau + kotak ROI mengikuti; kepal → merah, "Buka semua jari", tidak ada foto; punggung tangan → "Tunjukkan telapak…"; tahan 1 s → pindah ke `/hasil`.
@@ -445,15 +445,15 @@ Catatan: kotak ROI `terbuka_kanan` (s≈89, ke bawah 1.15s≈102 dari y≈306) h
 ### Task 8: Halaman Hasil (timeline) + Detail orang
 
 **Files:**
-- Create: `frontend/src/components/GrafikJarak.jsx`
-- Modify: `frontend/src/pages/Hasil.jsx`, `frontend/src/pages/DetailOrang.jsx`
+- Create: `frontend/src/components/DistanceChart.jsx`
+- Modify: `frontend/src/pages/Result.jsx`, `frontend/src/pages/PersonDetail.jsx`
 
 **Interfaces:**
 - Consumes: respons `/api/scan` (Task 5) lewat `location.state.hasil`; `ambilOrang(id)`.
 - Produces:
-  - `<GrafikJarak jarak={[{nama, sisi, jarak, orang_id}]} batas={number} />` — batang horizontal per entri, label "nama (sisi)", skala 0–0.5, garis vertikal di `batas`, batang di bawah batas hijau, lainnya abu-abu.
-  - `Hasil.jsx`: tanpa `location.state` → `<Navigate to="/" />`. Timeline vertikal: tiap langkah kartu bernomor dengan judul, gambar (langkah 6: grid 6 gambar berlabel; langkah 7: gambar + legenda warna), penjelasan, angka (pasangan kunci–nilai). Langkah 8 berisi `GrafikJarak`. Kotak hasil di bawah: `dikenali` → hijau, nama + jarak + tombol "Lihat detail" → `navigate("/orang/" + orang_id, { state: { sisi, jarak } })`; `tidak_dikenal` → oranye + pesan + "Scan ulang"; `gagal` → merah + pesan + "Scan ulang".
-  - `DetailOrang.jsx`: muat `ambilOrang(id)`; tampil nama, umur, status, tangan terdaftar; jika `location.state` ada: "Cocok dengan tangan <sisi>, jarak <x>"; 404 → "Orang tidak ditemukan"; tombol "Scan lagi".
+  - `<DistanceChart jarak={[{nama, sisi, jarak, orang_id}]} batas={number} />` — batang horizontal per entri, label "nama (sisi)", skala 0–0.5, garis vertikal di `batas`, batang di bawah batas hijau, lainnya abu-abu.
+  - `Result.jsx`: tanpa `location.state` → `<Navigate to="/" />`. Timeline vertikal: tiap langkah kartu bernomor dengan judul, gambar (langkah 6: grid 6 gambar berlabel; langkah 7: gambar + legenda warna), penjelasan, angka (pasangan kunci–nilai). Langkah 8 berisi `DistanceChart`. Kotak hasil di bawah: `dikenali` → hijau, nama + jarak + tombol "Lihat detail" → `navigate("/orang/" + orang_id, { state: { sisi, jarak } })`; `tidak_dikenal` → oranye + pesan + "Scan ulang"; `gagal` → merah + pesan + "Scan ulang".
+  - `PersonDetail.jsx`: muat `ambilOrang(id)`; tampil nama, umur, status, tangan terdaftar; jika `location.state` ada: "Cocok dengan tangan <sisi>, jarak <x>"; 404 → "Orang tidak ditemukan"; tombol "Scan lagi".
 
 - [ ] **Step 1: Implementasi** ketiga file. Gambar langkah ditampilkan dengan `image-rendering: pixelated` untuk peta 128×128 agar tidak buram.
 - [ ] **Step 2: `npm run build`** → sukses.
@@ -465,15 +465,15 @@ Catatan: kotak ROI `terbuka_kanan` (s≈89, ke bawah 1.15s≈102 dari y≈306) h
 ### Task 9: Halaman Daftar
 
 **Files:**
-- Modify: `frontend/src/pages/Daftar.jsx`
+- Modify: `frontend/src/pages/Register.jsx`
 
 **Interfaces:**
-- Consumes: `KameraTangan mode="beruntun"`, `sampel`, `simpanOrang`, `daftarOrang`.
+- Consumes: `PalmCamera mode="beruntun"`, `sampel`, `simpanOrang`, `daftarOrang`.
 - Produces: alur dua tahap.
   1. **Form:** pilihan "Orang baru" atau nama orang yang sudah terdaftar (dari `daftarOrang()`). Orang baru: nama (wajib, ≤100), umur (`type=number`, 1–120), status (select 4 pilihan). Tangan kiri/kanan (radio). Centang persetujuan wajib. Jika orang lama sudah punya tangan itu → `window.confirm("Tangan <sisi> milik <nama> sudah terdaftar. Ganti?")`; batal = tetap di form; setuju = `ganti: true`.
   2. **Kamera:** progres "n/8". Tiap `onAmbil` → `sampel(frame)`; valid → simpan `kode` + `sisi` ke array; tidak valid → tampilkan pesan 2 detik, tidak dihitung. Saat 8 terkumpul → `aktif=false` → `simpanOrang({ ..., kode, sisi_terdeteksi, persetujuan: true, ganti })`. Sukses → "Tersimpan: <nama> (tangan <sisi>)" + tautan "Coba scan". Galat (400/409) → tampilkan pesan + tombol "Ulangi pengambilan" (mengosongkan sampel). Tombol "Batal" kapan saja → kembali ke form, tidak ada yang tersimpan.
 
-- [ ] **Step 1: Implementasi** `Daftar.jsx`.
+- [ ] **Step 1: Implementasi** `Register.jsx`.
 - [ ] **Step 2: `npm run build`** → sukses.
 - [ ] **Step 3: Cek manual:** daftar orang baru tangan kanan → 8/8 → tersimpan, terlihat di HeidiSQL tabel `telapak` (kolom `kode` 131072 byte); pilih "kanan" tapi tunjukkan tangan kiri → ditolak dengan pesan sisi; tambah tangan kiri ke orang yang sama → berhasil; daftar ulang tangan yang sama → muncul konfirmasi ganti.
 - [ ] **Step 4: Commit** `feat(frontend): halaman pendaftaran 8 sampel`.
@@ -483,7 +483,7 @@ Catatan: kotak ROI `terbuka_kanan` (s≈89, ke bawah 1.15s≈102 dari y≈306) h
 ### Task 10: Halaman Data terdaftar
 
 **Files:**
-- Modify: `frontend/src/pages/DataTerdaftar.jsx`
+- Modify: `frontend/src/pages/RegisteredData.jsx`
 
 **Interfaces:**
 - Consumes: `daftarOrang`, `hapusOrang`, `hapusSemua`.
@@ -499,10 +499,10 @@ Catatan: kotak ROI `terbuka_kanan` (s≈89, ke bawah 1.15s≈102 dari y≈306) h
 ### Task 11: Bersih-bersih, README, uji akhir
 
 **Files:**
-- Delete: `palm.py`, `daftar.py`, `scan.py`, `hapus.py`, `requirements.txt` (root), `__pycache__/`
+- Delete: `palm.py`, `register.py`, `scan.py`, `delete.py`, `requirements.txt` (root), `__pycache__/`
 - Modify: `README.md`
 
-- [ ] **Step 1: Hapus file lama** (`git rm palm.py daftar.py scan.py hapus.py requirements.txt`). Folder `data_terdaftar/` dibiarkan (diabaikan git); sebutkan di README bahwa isinya tidak dipakai lagi dan boleh dihapus.
+- [ ] **Step 1: Hapus file lama** (`git rm palm.py register.py scan.py delete.py requirements.txt`). Folder `registered_data/` dibiarkan (diabaikan git); sebutkan di README bahwa isinya tidak dipakai lagi dan boleh dihapus.
 - [ ] **Step 2: Perbarui README** (Bahasa Indonesia), pertahankan bagian yang masih berlaku (latar belakang, metode, rujukan, privasi, narasi presentasi, tabel pengujian) dan ganti bagian teknis:
   - Isi folder (backend/frontend), kebutuhan (Python 3.10, Node, Laragon MySQL).
   - Instalasi: `cd backend && pip install -r requirements.txt && copy .env.example .env`; `cd frontend && npm install` (butuh internet sekali; mengunduh model MediaPipe).

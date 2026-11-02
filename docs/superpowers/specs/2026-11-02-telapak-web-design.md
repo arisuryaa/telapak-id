@@ -5,7 +5,7 @@ Status: disetujui pemilik proyek (2026-11-02)
 
 ## 1. Maksud dan alasan
 
-Telapak ID adalah tugas akhir mata kuliah: pengenalan identitas dari pola telapak tangan dengan computer vision klasik (filter Gabor + Competitive Code, tanpa training). Versi sekarang berjalan di terminal + jendela OpenCV ([palm.py](../../../palm.py), [daftar.py](../../../daftar.py), [scan.py](../../../scan.py), [hapus.py](../../../hapus.py)), dan menyimpan kode di file `.npy`.
+Telapak ID adalah tugas akhir mata kuliah: pengenalan identitas dari pola telapak tangan dengan computer vision klasik (filter Gabor + Competitive Code, tanpa training). Versi sekarang berjalan di terminal + jendela OpenCV ([palm.py](../../../palm.py), [register.py](../../../register.py), [scan.py](../../../scan.py), [delete.py](../../../delete.py)), dan menyimpan kode di file `.npy`.
 
 Versi web ini dibuat untuk **presentasi ke dosen**. Dua pesan yang harus sampai:
 
@@ -83,13 +83,13 @@ Backend (Python Flask)
 ### Struktur folder (usulan)
 
 ```
-backend/   app.py, palm.py, validasi.py, langkah.py, db.py, requirements.txt, tests/
+backend/   app.py, palm.py, validation.py, steps.py, db.py, requirements.txt, tests/
 frontend/  (Vite + React + Tailwind) src/pages/{Scan,Hasil,DetailOrang,Daftar,DataTerdaftar}.jsx
 docs/
 README.md
 ```
 
-File lama `daftar.py`, `scan.py`, `hapus.py` dihapus karena digantikan web; `palm.py` dipindah ke `backend/`. Data `.npy` lama tidak dimigrasi (cukup daftar ulang). (Keputusan Claude.)
+File lama `register.py`, `scan.py`, `delete.py` dihapus karena digantikan web; `palm.py` dipindah ke `backend/`. Data `.npy` lama tidak dimigrasi (cukup daftar ulang). (Keputusan Claude.)
 
 ## 8. Halaman
 
@@ -132,7 +132,7 @@ Nama, umur, status, tangan yang cocok (kiri/kanan) dan jaraknya (dari scan barus
 5. Selesai: pesan sukses + tautan ke Scan.
 
 ### 5. Data terdaftar (`/data`)
-Tabel: nama, umur, status, tangan terdaftar, tanggal daftar. Tombol hapus per orang (dengan konfirmasi) dan "Hapus semua" (dengan konfirmasi). Menggantikan `hapus.py`.
+Tabel: nama, umur, status, tangan terdaftar, tanggal daftar. Tombol hapus per orang (dengan konfirmasi) dan "Hapus semua" (dengan konfirmasi). Menggantikan `delete.py`.
 
 Navigasi atas sederhana: Scan · Daftar · Data terdaftar.
 
@@ -193,4 +193,4 @@ Bentuk persis payload diserahkan ke builder.
 - Pewarnaan peta Competitive Code dan respons Gabor.
 - Tes: tes otomatis untuk fungsi backend (validasi kualitas ROI, pipeline langkah, simpan/muat kode dari database, jarak). Tes frontend tidak wajib.
 - README diperbarui: cara instal (pip, npm), menyalakan MySQL Laragon, menjalankan backend + frontend, dan penjelasan alur sesuai versi web.
-- Menambahkan `.gitignore` (`__pycache__/`, `node_modules/`, `.env`, `data_terdaftar/`, `.superpowers/`).
+- Menambahkan `.gitignore` (`__pycache__/`, `node_modules/`, `.env`, `registered_data/`, `.superpowers/`).
