@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { HandLandmarker } from "@mediapipe/tasks-vision";
 import { useHandTracker } from "../hooks/useHandTracker.js";
-import { AMBANG, kotakRoi, periksa } from "../lib/validation.js";
+import { AMBANG, kotakRoi, periksa, silangTelapak } from "../lib/validation.js";
 
 const CHECKS = [
   ["terdeteksi", "Tangan terdeteksi"],
@@ -185,6 +185,13 @@ export default function PalmCamera({ mode = "sekali", onAmbil, aktif = true }) {
             </li>
           ))}
         </ul>
+        {/* TEMPORARY DEBUG: remove after calibrating palm/side checks */}
+        <p className="mt-3 font-mono text-xs text-slate-700">
+          label: {hasil?.label ?? "-"} · sisi: {status.sisi ?? "-"} · silang:{" "}
+          {hasil?.lm
+            ? silangTelapak(hasil.lm, videoRef.current?.videoWidth || 640, videoRef.current?.videoHeight || 480).toFixed(0)
+            : "-"}
+        </p>
         <p className="mt-3 text-xs text-slate-500">
           Foto diambil otomatis jika semua syarat terpenuhi dan tangan ditahan sekitar 1 detik.
         </p>

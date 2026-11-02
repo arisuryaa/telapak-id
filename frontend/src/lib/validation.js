@@ -26,6 +26,14 @@ export function sisiDariLabel(label) {
   return label === "Left" ? "kanan" : "kiri";
 }
 
+// Debug helper: the sign of this cross product decides palm vs back of hand.
+export function silangTelapak(lm, w, h) {
+  const p0 = px(lm, 0, w, h);
+  const a = px(lm, 5, w, h);
+  const b = px(lm, 17, w, h);
+  return (a.x - p0.x) * (b.y - p0.y) - (a.y - p0.y) * (b.x - p0.x);
+}
+
 export function jariTerbuka(lm, w, h) {
   const p0 = px(lm, 0, w, h);
   for (const [ujung, pip] of PASANGAN_JARI) {
