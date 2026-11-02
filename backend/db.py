@@ -58,9 +58,16 @@ class Telapak(Base):
     orang: Mapped[Orang] = relationship(back_populates="telapak")
 
 
-def _pesan_tidak_tersedia(url):
+def _pesan_tidak_tersedia(url, err):
+    detail = getattr(err, "orig", None) or err
     return (f"MySQL tidak bisa dihubungi di {url.host}:{url.port or 3306}. "
-            "Nyalakan MySQL di Laragon lalu jalankan ulang.")
+            f"Nyalakan MySQL di Laragon lalu jalankan ulang. Detail: {detail}")
+
+
+def _url_server(u):
+    """Same server URL without a database, used to create the database first.
+    URL.set(database=None) would keep the old value, so replace it directly."""
+    return u._replace(database=None)
 
 
 def buat_engine(url):
@@ -69,13 +76,13 @@ def buat_engine(url):
     try:
         if u.get_backend_name() == "mysql":
             nama_db = u.database
-            with create_engine(u.set(database=None)).connect() as conn:
+            with create_engine(_url_server(u)).connect() as conn:
                 conn.execute(text(f"CREATE DATABASE IF NOT EXISTS `{nama_db}` CHARACTER SET utf8mb4"))
                 conn.commit()
         engine = create_engine(url, pool_pre_ping=True)
         Base.metadata.create_all(engine)
     except OperationalError as e:
-        raise DatabaseTidakTersedia(_pesan_tidak_tersedia(u)) from e
+        raise DatabaseTidakTersedia(_pesan_tidak_tersedia(u, e)) from e
     return engine
 
 

@@ -58,3 +58,16 @@ def test_hapus_kaskade(s):
 def test_engine_mysql_mati():
     with pytest.raises(DatabaseTidakTersedia, match="Laragon"):
         buat_engine("mysql+pymysql://root:@127.0.0.1:1/telapak_id")
+
+
+def test_url_server_tanpa_database():
+    from sqlalchemy.engine import make_url
+    from db import _url_server
+    u = _url_server(make_url("mysql+pymysql://root:@localhost:3306/telapak_id"))
+    assert u.database is None
+    assert (u.host, u.port, u.username) == ("localhost", 3306, "root")
+
+
+def test_pesan_galat_menyertakan_detail():
+    with pytest.raises(DatabaseTidakTersedia, match="Detail:"):
+        buat_engine("mysql+pymysql://root:@127.0.0.1:1/telapak_id")
