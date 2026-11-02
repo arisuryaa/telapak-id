@@ -2,6 +2,8 @@
 import cv2
 import numpy as np
 
+import palm
+
 AMBANG = {"rasio_jari": 1.1, "rasio_jempol": 0.7,
           "terang_min": 40, "terang_max": 215, "tajam_min": 20.0}
 
@@ -51,8 +53,14 @@ def menghadap_kamera(lm, sisi, w, h):
 
 
 def ukur_roi(roi):
-    """Return (mean brightness, sharpness as variance of the Laplacian)."""
-    return float(roi.mean()), float(cv2.Laplacian(roi, cv2.CV_64F).var())
+    """Return (mean brightness, sharpness).
+
+    Sharpness is the variance of the Laplacian measured after CLAHE, on the same
+    image the Gabor filters see. Raw palm skin is smooth (about 3-5 on a sharp
+    webcam photo), so measuring before CLAHE rejected good photos.
+    """
+    tajam = cv2.Laplacian(palm.terapkan_clahe(roi), cv2.CV_64F).var()
+    return float(roi.mean()), float(tajam)
 
 
 def kualitas_roi(roi):

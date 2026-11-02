@@ -84,9 +84,14 @@ _FILTER = _buat_filter()
 _CLAHE = cv2.createCLAHE(clipLimit=2.0, tileGridSize=(4, 4))
 
 
+def terapkan_clahe(roi_gray):
+    """Contrast enhancement used before the Gabor filters (step 5)."""
+    return _CLAHE.apply(roi_gray)
+
+
 def hitung_kode_detail(roi_gray):
     """Competitive Code plus its intermediate arrays: CLAHE image, 6 Gabor responses, code."""
-    clahe = _CLAHE.apply(roi_gray)
+    clahe = terapkan_clahe(roi_gray)
     g = clahe.astype(np.float32)
     g = (g - g.mean()) / (g.std() + 1e-6)
     respons = np.stack([cv2.filter2D(g, cv2.CV_32F, k) for k in _FILTER])

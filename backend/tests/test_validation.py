@@ -38,3 +38,27 @@ def test_kualitas_roi():
     assert kualitas_roi(np.full((128, 128), 250, np.uint8)) == "Foto terlalu terang"
     assert kualitas_roi(np.full((128, 128), 128, np.uint8)) == "Foto kurang jelas, tahan tangan lebih diam"
     assert kualitas_roi(np.load(FIX / "roi_test.npy")) is None
+
+
+def roi_telapak_halus(seed=3):
+    """Smooth skin with faint palm lines, like a real webcam ROI (low raw sharpness)."""
+    import cv2  # noqa: F401
+    rng = np.random.default_rng(seed)
+    y, x = np.mgrid[0:128, 0:128].astype(np.float32)
+    img = 175 + 8 * np.sin(x / 37) + 6 * np.cos(y / 29)
+    for a, b, c in [(1, -0.6, -20), (0.3, -1, 60), (1, 0.9, -150), (-0.4, -1, 100)]:
+        d = np.abs(a * x + b * y + c) / np.hypot(a, b)
+        img -= 10 * np.exp(-d ** 2 / 3)
+    img += rng.normal(0, 0.8, img.shape)
+    return np.clip(img, 0, 255).astype(np.uint8)
+
+
+def test_telapak_halus_lolos():
+    # A real palm ROI was rejected because sharpness was measured before CLAHE.
+    assert kualitas_roi(roi_telapak_halus()) is None
+
+
+def test_telapak_buram_ditolak():
+    import cv2
+    buram = cv2.GaussianBlur(roi_telapak_halus(), (0, 0), 3)
+    assert kualitas_roi(buram) == "Foto kurang jelas, tahan tangan lebih diam"
