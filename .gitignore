@@ -1,0 +1,14 @@
+# Python
+__pycache__/
+*.pyc
+.pytest_cache/
+backend/.env
+
+# Node / frontend build
+node_modules/
+frontend/dist/
+frontend/public/mediapipe/
+
+# Local data and agent scratch files
+registered_data/
+.superpowers/
