@@ -4,13 +4,17 @@ The steps stop at the first check that fails and record which step it was,
 so the results page can show exactly how far the photo got.
 """
 import base64
+import logging
 from dataclasses import dataclass
 
 import cv2
 import numpy as np
 
 import palm
-from validation import jari_terbuka, kualitas_roi, menghadap_kamera, sisi_dari_label
+from validation import (jari_terbuka, kualitas_roi, menghadap_kamera, silang_telapak,
+                        sisi_dari_label, ukur_roi)
+
+log = logging.getLogger("telapak")
 
 
 def baca_frame(data_url):
@@ -39,7 +43,25 @@ class Analisis:
 
 
 def analisis(frame_bgr, deteksi=palm.deteksi_tangan):
-    """Run steps 1-7 on one frame. `deteksi` is injectable for tests."""
+    """Run steps 1-7 on one frame and log a one-line summary. `deteksi` is injectable for tests."""
+    a = _analisis(frame_bgr, deteksi)
+    _catat(a)
+    return a
+
+
+def _catat(a):
+    h, w = a.frame.shape[:2]
+    bagian = [f"frame={w}x{h}", f"tahap={a.tahap}"]
+    if a.lm is not None:
+        bagian.append(f"label={a.label} sisi={a.sisi} silang={silang_telapak(a.lm, w, h):.0f}")
+    if a.roi_detail is not None:
+        terang, tajam = ukur_roi(a.roi_detail["roi"])
+        bagian.append(f"roi_terang={terang:.1f} roi_tajam={tajam:.1f}")
+    bagian.append(f"hasil=gagal: {a.gagal}" if a.gagal else "hasil=lolos")
+    log.info("analisis %s", " ".join(bagian))
+
+
+def _analisis(frame_bgr, deteksi):
     a = Analisis(frame=frame_bgr)
     hasil = deteksi(frame_bgr)
     if hasil is None:

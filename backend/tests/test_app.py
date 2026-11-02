@@ -116,3 +116,16 @@ def test_hapus(client):
     assert client.get(f"/api/orang/{orang['id']}").status_code == 404
     client.post("/api/orang", json=body_daftar(s["kode"]))
     assert client.delete("/api/orang").get_json() == {"dihapus": 1}
+
+
+def test_api_mencatat_log(client, caplog):
+    import logging
+    with caplog.at_level(logging.INFO, logger="telapak"):
+        s = sampel_valid(client)
+        client.post("/api/orang", json=body_daftar(s["kode"]))
+        client.post("/api/scan", json={"frame": FRAME, "batas": 0.38})
+        client.post("/api/orang", json=body_daftar(s["kode"], umur=0))
+    assert "sampel: diterima, sisi=kanan" in caplog.text
+    assert "tersimpan: orang_id=1 sisi=kanan" in caplog.text
+    assert "scan: dikenali, terdekat dewa (kanan) jarak=0.000" in caplog.text
+    assert "POST /api/orang -> 400: Umur harus angka" in caplog.text

@@ -56,3 +56,14 @@ def test_lengkap_tujuh_langkah_dan_kode_jujur():
     assert [l["no"] for l in ls] == [1, 2, 3, 4, 5, 6, 7, 8]
     assert len(ls[5]["gambar"]) == 6 and len(ls[6]["legenda"]) == 6
     assert all(g["src"].startswith("data:image/") for l in ls for g in l["gambar"])
+
+
+def test_analisis_mencatat_log(caplog):
+    import logging
+    with caplog.at_level(logging.INFO, logger="telapak"):
+        analisis(frame_uji(), deteksi=lambda f: (lm("terbuka_kanan"), "Left"))
+        analisis(frame_uji(), deteksi=lambda f: (lm("punggung_kanan"), "Left"))
+    assert "label=Left sisi=kanan silang=-" in caplog.text
+    assert "roi_terang=" in caplog.text and "roi_tajam=" in caplog.text
+    assert "hasil=lolos" in caplog.text
+    assert "hasil=gagal: Tunjukkan telapak tangan" in caplog.text

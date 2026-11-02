@@ -13,9 +13,24 @@ def _px(lm, i, w, h):
     return np.array([lm[i].x * w, lm[i].y * h])
 
 
+# The legacy mp.solutions Hands API assumes a mirrored (selfie) image. Frames sent
+# by the browser are unmirrored, so a real right hand is reported as "Left".
+# The browser uses MediaPipe Tasks, which labels the real hand (see validation.js).
+LABEL_KANAN = "Left"
+
+
 def sisi_dari_label(label):
     """Map MediaPipe's label on the unmirrored frame to the hand's side."""
-    return "kanan" if label == "Left" else "kiri"
+    return "kanan" if label == LABEL_KANAN else "kiri"
+
+
+def silang_telapak(lm, w, h):
+    """Cross product of wrist->index base and wrist->little base (image y points down).
+    Its sign, together with the hand side, tells palm from back of hand."""
+    p0 = _px(lm, 0, w, h)
+    a = _px(lm, 5, w, h) - p0
+    b = _px(lm, 17, w, h) - p0
+    return float(a[0] * b[1] - a[1] * b[0])
 
 
 def jari_terbuka(lm, w, h):
@@ -31,20 +46,22 @@ def jari_terbuka(lm, w, h):
 def menghadap_kamera(lm, sisi, w, h):
     """Palm faces the camera when the cross product of wrist->index and wrist->little
     has the sign expected for that hand (image y points down)."""
-    p0 = _px(lm, 0, w, h)
-    a = _px(lm, 5, w, h) - p0
-    b = _px(lm, 17, w, h) - p0
-    z = a[0] * b[1] - a[1] * b[0]
+    z = silang_telapak(lm, w, h)
     return z < 0 if sisi == "kanan" else z > 0
+
+
+def ukur_roi(roi):
+    """Return (mean brightness, sharpness as variance of the Laplacian)."""
+    return float(roi.mean()), float(cv2.Laplacian(roi, cv2.CV_64F).var())
 
 
 def kualitas_roi(roi):
     """Return None if the ROI is usable, otherwise the reason in Indonesian."""
-    rata = float(roi.mean())
-    if rata < AMBANG["terang_min"]:
+    terang, tajam = ukur_roi(roi)
+    if terang < AMBANG["terang_min"]:
         return "Foto terlalu gelap, tambah cahaya"
-    if rata > AMBANG["terang_max"]:
+    if terang > AMBANG["terang_max"]:
         return "Foto terlalu terang"
-    if cv2.Laplacian(roi, cv2.CV_64F).var() < AMBANG["tajam_min"]:
+    if tajam < AMBANG["tajam_min"]:
         return "Foto kurang jelas, tahan tangan lebih diam"
     return None

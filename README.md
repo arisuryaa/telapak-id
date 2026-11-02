@@ -115,6 +115,17 @@ Skala jarak: 0 = identik, sekitar 0,5 = pola acak. Batas yang baik **harus diset
 - Data bisa dihapus per orang atau sekaligus lewat halaman *Data terdaftar*.
 - Seluruh data demo sebaiknya dihapus setelah presentasi.
 
+### Log untuk debugging
+
+- **Terminal backend** (`python app.py`): satu baris per foto yang dianalisis, misalnya
+  `analisis frame=1280x720 tahap=7 label=Left sisi=kanan silang=-10080 roi_terang=127.7 roi_tajam=36.0 hasil=lolos`,
+  lalu ringkasan `scan: ...`, `sampel: ...`, `tersimpan: ...`. Permintaan yang ditolak muncul sebagai `WARNING`.
+- **Console browser** (F12 → Console, filter `[Telapak]`): perubahan status tangan (label, sisi, silang, tiap syarat), foto yang diambil, dan setiap panggilan API beserta durasinya.
+- **Panel "Info teknis"** di bawah syarat foto: label, sisi, dan nilai silang secara langsung.
+
+Aturan telapak vs punggung tangan: untuk tangan kanan, telapak menghadap kamera jika `silang < 0`; untuk tangan kiri jika `silang > 0`.
+Label kiri/kanan dari MediaPipe berbeda antara browser dan server: versi Python (`mp.solutions`) menganggap gambar dicermin, sehingga tangan kanan asli dilaporkan sebagai `Left`. Versi browser (MediaPipe Tasks) melaporkan tangan asli, `Right`. Pemetaannya ada di konstanta `LABEL_KANAN` di `backend/validation.py` dan `frontend/src/lib/validation.js`.
+
 ## 9. Menjalankan tes
 
 ```bash

@@ -1,5 +1,6 @@
 """app.py - Flask API for scanning, collecting samples, and managing enrolled people."""
 import base64
+import logging
 import os
 import sys
 from collections import Counter
@@ -7,6 +8,7 @@ from collections import Counter
 import numpy as np
 from dotenv import load_dotenv
 from flask import Flask, jsonify, request
+from sqlalchemy.engine import make_url
 from sqlalchemy.orm import Session
 
 import palm
@@ -22,8 +24,11 @@ BYTE_PER_SAMPEL = 128 * 128  # one sample is a 128x128 uint8 map
 JUMLAH_SAMPEL = 8
 DATABASE_DEFAULT = "mysql+pymysql://root:@localhost:3306/telapak_id"
 
+log = logging.getLogger("telapak")
+
 
 def _galat(pesan, status=400, **extra):
+    log.warning("%s %s -> %d: %s", request.method, request.path, status, pesan)
     return jsonify({"pesan": pesan, **extra}), status
 
 
@@ -52,6 +57,7 @@ def create_app(database_url=None, deteksi=palm.deteksi_tangan):
 
     app = Flask(__name__)
     engine = buat_engine(database_url)
+    log.info("database: %s", make_url(database_url).render_as_string(hide_password=True))
 
     @app.post("/api/scan")
     def scan():
@@ -89,6 +95,11 @@ def create_app(database_url=None, deteksi=palm.deteksi_tangan):
             else:
                 hasil = {"status": "tidak_dikenal", "pesan": "Tidak dikenal",
                          "jarak": terdekat["jarak"]}
+        if jarak:
+            log.info("scan: %s, terdekat %s (%s) jarak=%.3f, batas=%.2f", hasil["status"],
+                     jarak[0]["nama"], jarak[0]["sisi"], jarak[0]["jarak"], batas)
+        else:
+            log.info("scan: %s (belum ada yang terdaftar)", hasil["status"])
         return jsonify({"langkah": susun_langkah(a, jarak=jarak, batas=batas),
                         "jarak": jarak, "batas": batas, "hasil": hasil})
 
@@ -100,7 +111,9 @@ def create_app(database_url=None, deteksi=palm.deteksi_tangan):
             return _galat("Gambar tidak valid")
         a = analisis(frame, deteksi=deteksi)
         if a.gagal:
+            log.info("sampel: ditolak, %s", a.gagal)
             return jsonify({"valid": False, "pesan": a.gagal, "sisi": None, "kode": None})
+        log.info("sampel: diterima, sisi=%s", a.sisi)
         return jsonify({"valid": True, "pesan": "Sampel diterima", "sisi": a.sisi,
                         "kode": base64.b64encode(a.kode.tobytes()).decode("ascii")})
 
@@ -152,6 +165,7 @@ def create_app(database_url=None, deteksi=palm.deteksi_tangan):
                 return _galat(f"Tangan {sisi} sudah terdaftar. Ganti data lama?", 409,
                               perlu_konfirmasi=True)
             s.commit()
+            log.info("tersimpan: orang_id=%s sisi=%s ganti=%s", orang_id, sisi, ganti)
             return jsonify({"orang": ambil_orang(s, orang_id)}), 201
 
     @app.get("/api/orang")
@@ -170,6 +184,8 @@ def create_app(database_url=None, deteksi=palm.deteksi_tangan):
         with Session(engine) as s:
             ada = hapus_orang(s, orang_id)
             s.commit()
+        if ada:
+            log.info("dihapus: orang_id=%s", orang_id)
         return ("", 204) if ada else _galat("Orang tidak ditemukan", 404)
 
     @app.delete("/api/orang")
@@ -177,12 +193,15 @@ def create_app(database_url=None, deteksi=palm.deteksi_tangan):
         with Session(engine) as s:
             jumlah = hapus_semua(s)
             s.commit()
+        log.info("dihapus semua: %d orang", jumlah)
         return jsonify({"dihapus": jumlah})
 
     return app
 
 
 if __name__ == "__main__":
+    logging.basicConfig(level=logging.INFO, datefmt="%H:%M:%S",
+                        format="%(asctime)s %(levelname)s [%(name)s] %(message)s")
     try:
         app = create_app()
     except DatabaseTidakTersedia as e:
