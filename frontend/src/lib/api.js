@@ -1,6 +1,9 @@
 // Thin wrapper around the Flask API. Errors carry the server's Indonesian message.
+import { log, logPeringatan } from "./log.js";
 
 async function kirim(path, opsi = {}) {
+  const metode = opsi.method ?? "GET";
+  const mulai = performance.now();
   const res = await fetch(path, {
     headers: { "Content-Type": "application/json" },
     ...opsi,
@@ -11,12 +14,17 @@ async function kirim(path, opsi = {}) {
   } catch {
     // 204 No Content and plain-text errors have no JSON body
   }
+  const ms = Math.round(performance.now() - mulai);
+  const pesan = data?.hasil?.pesan ?? data?.pesan;
+  const ringkas = `${metode} ${path} → ${res.status} (${ms} ms)${pesan ? `: ${pesan}` : ""}`;
   if (!res.ok) {
+    logPeringatan(ringkas);
     const err = new Error(data?.pesan ?? `Permintaan gagal (${res.status})`);
     err.status = res.status;
     err.data = data;
     throw err;
   }
+  log(ringkas);
   return data;
 }
 

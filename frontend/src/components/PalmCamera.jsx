@@ -1,7 +1,10 @@
 import { useEffect, useRef, useState } from "react";
 import { HandLandmarker } from "@mediapipe/tasks-vision";
 import { useHandTracker } from "../hooks/useHandTracker.js";
-import { AMBANG, kotakRoi, periksa, silangTelapak } from "../lib/validation.js";
+import { AMBANG, kotakRoi, periksa } from "../lib/validation.js";
+import { log, logGalat } from "../lib/log.js";
+
+const tanda = (ok) => (ok ? "✔" : "✖");
 
 const CHECKS = [
   ["terdeteksi", "Tangan terdeteksi"],
@@ -24,6 +27,7 @@ export default function PalmCamera({ mode = "sekali", onAmbil, aktif = true }) {
   const [sibuk, setSibuk] = useState(false);
 
   const prevLm = useRef(null);
+  const kunciLogTerakhir = useRef("");
   const tahanMulai = useRef(null);
   const berikutnya = useRef(0);
   const selesai = useRef(false);
@@ -47,9 +51,12 @@ export default function PalmCamera({ mode = "sekali", onAmbil, aktif = true }) {
           return;
         }
         stream = s;
+        const { width, height } = s.getVideoTracks()[0]?.getSettings() ?? {};
+        log(`kamera aktif ${width}×${height}`);
         if (videoRef.current) videoRef.current.srcObject = s;
       })
-      .catch(() => {
+      .catch((err) => {
+        logGalat(`kamera gagal: ${err.name}: ${err.message}`);
         if (!batal) {
           setKameraGalat("Kamera tidak bisa dibuka. Izinkan akses kamera di browser lalu muat ulang halaman.");
         }
@@ -77,6 +84,19 @@ export default function PalmCamera({ mode = "sekali", onAmbil, aktif = true }) {
     const p = periksa(lm, hasil?.label ?? null, prevLm.current, w, h);
     prevLm.current = lm;
     setStatus(p);
+
+    // Log only when the label or a check result changes, not on every frame.
+    const kunciLog = [p.label, p.sisi, p.jari, p.menghadap, p.jarak, p.diam].join("|");
+    if (kunciLog !== kunciLogTerakhir.current) {
+      kunciLogTerakhir.current = kunciLog;
+      log(
+        lm
+          ? `tangan label=${p.label} sisi=${p.sisi} silang=${p.silang.toFixed(0)} ` +
+            `jari=${tanda(p.jari)} menghadap=${tanda(p.menghadap)} jarak=${tanda(p.jarak)} ` +
+            `diam=${tanda(p.diam)} → ${p.pesan}`
+          : "tangan tidak terdeteksi",
+      );
+    }
 
     const canvas = overlayRef.current;
     if (canvas) {
@@ -128,6 +148,7 @@ export default function PalmCamera({ mode = "sekali", onAmbil, aktif = true }) {
     kanvas.height = h;
     kanvas.getContext("2d").drawImage(video, 0, 0, w, h);
     const frame = kanvas.toDataURL("image/jpeg", 0.92);
+    log(`foto diambil ${w}×${h} sisi=${p.sisi} (${Math.round(frame.length / 1024)} KB)`);
     sibukRef.current = true;
     setSibuk(true);
     Promise.resolve(onAmbilRef.current?.(frame, { sisi: p.sisi }))
@@ -185,13 +206,18 @@ export default function PalmCamera({ mode = "sekali", onAmbil, aktif = true }) {
             </li>
           ))}
         </ul>
-        {/* TEMPORARY DEBUG: remove after calibrating palm/side checks */}
-        <p className="mt-3 font-mono text-xs text-slate-700">
-          label: {hasil?.label ?? "-"} · sisi: {status.sisi ?? "-"} · silang:{" "}
-          {hasil?.lm
-            ? silangTelapak(hasil.lm, videoRef.current?.videoWidth || 640, videoRef.current?.videoHeight || 480).toFixed(0)
-            : "-"}
-        </p>
+        <details className="mt-3 text-xs text-slate-600">
+          <summary className="cursor-pointer select-none">Info teknis</summary>
+          <dl className="mt-2 grid grid-cols-[auto_1fr] gap-x-3 gap-y-0.5 font-mono">
+            <dt>label</dt>
+            <dd>{status.label ?? "-"}</dd>
+            <dt>sisi</dt>
+            <dd>{status.sisi ?? "-"}</dd>
+            <dt>silang</dt>
+            <dd>{status.silang?.toFixed(0) ?? "-"}</dd>
+          </dl>
+          <p className="mt-1">Tangan kanan: telapak jika silang &lt; 0. Tangan kiri: telapak jika silang &gt; 0.</p>
+        </details>
         <p className="mt-3 text-xs text-slate-500">
           Foto diambil otomatis jika semua syarat terpenuhi dan tangan ditahan sekitar 1 detik.
         </p>
