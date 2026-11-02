@@ -1,0 +1,8 @@
+mediapipe==0.10.14
+numpy<2
+flask==3.1.1
+sqlalchemy>=2.0,<2.1
+pymysql
+cryptography
+python-dotenv
+pytest
