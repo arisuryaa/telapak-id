@@ -24,8 +24,12 @@ def deteksi_tangan(frame_bgr):
     return hasil.multi_hand_landmarks[0].landmark, label
 
 
-def ambil_roi_detail(frame_bgr, lm):
-    """Cut the palm ROI and return the intermediate steps, or None if it does not fit."""
+def ambil_roi_detail(frame_bgr, lm, skala=1.0):
+    """Cut the palm ROI and return the intermediate steps, or None if it does not fit.
+
+    skala=1.0 is the journal box (palm width square). A larger value grows the
+    box evenly around the same centre to include more of the palm.
+    """
     h, w = frame_bgr.shape[:2]
     p5 = np.array([lm[5].x * w, lm[5].y * h])    # index finger base
     p17 = np.array([lm[17].x * w, lm[17].y * h])  # little finger base
@@ -44,11 +48,12 @@ def ambil_roi_detail(frame_bgr, lm):
     p0r = M @ np.array([p0[0], p0[1], 1.0])
     arah = 1 if p0r[1] > pusat[1] else -1  # is the wrist below or above the line?
 
-    s = jarak  # box side = palm width
-    y_mulai = pusat[1] + arah * 0.15 * s
-    y_akhir = pusat[1] + arah * 1.15 * s
+    s = jarak  # palm width; the journal box is s x s
+    tambah = 0.5 * (skala - 1)  # 0.0 at skala=1.0, so the journal values stay exact
+    y_mulai = pusat[1] + arah * (0.15 - tambah) * s
+    y_akhir = pusat[1] + arah * (1.15 + tambah) * s
     y1, y2 = int(min(y_mulai, y_akhir)), int(max(y_mulai, y_akhir))
-    x1, x2 = int(pusat[0] - s / 2), int(pusat[0] + s / 2)
+    x1, x2 = int(pusat[0] - skala * s / 2), int(pusat[0] + skala * s / 2)
     if x1 < 0 or y1 < 0 or x2 > w or y2 > h:
         return None  # box goes outside the image
     roi = rot[y1:y2, x1:x2]
@@ -63,9 +68,9 @@ def ambil_roi_detail(frame_bgr, lm):
     }
 
 
-def ambil_roi(frame_bgr, lm):
+def ambil_roi(frame_bgr, lm, skala=1.0):
     """Return only the 128x128 grayscale palm ROI, or None."""
-    detail = ambil_roi_detail(frame_bgr, lm)
+    detail = ambil_roi_detail(frame_bgr, lm, skala)
     return None if detail is None else detail["roi"]
 
 

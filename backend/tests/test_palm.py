@@ -47,3 +47,27 @@ def test_roi_dari_landmark_tiruan():
 def test_roi_none_jika_terlalu_kecil():
     lm = titik_tiruan({0: (320, 420), 5: (330, 300), 17: (310, 300)}, 640, 480)
     assert palm.ambil_roi(np.zeros((480, 640, 3), np.uint8), lm) is None
+
+
+def test_kotak_skala_satu_sama_dengan_rumus_jurnal():
+    # Same box as the original terminal version: s x s, from 0.15s to 1.15s below the knuckles.
+    lm = titik_tiruan({0: (320, 420), 5: (360, 300), 17: (272, 312)}, 640, 480)
+    frame = np.zeros((480, 640, 3), np.uint8)
+    p5, p17 = np.array([360.0, 300.0]), np.array([272.0, 312.0])
+    s, pusat = float(np.linalg.norm(p17 - p5)), (p5 + p17) / 2
+    d = palm.ambil_roi_detail(frame, lm, skala=1.0)
+    x1, y1, x2, y2 = d["kotak"]
+    assert (x1, x2) == (int(pusat[0] - s / 2), int(pusat[0] + s / 2))
+    assert y2 - y1 in (int(s) - 1, int(s), int(s) + 1)
+    assert d["kotak"] == palm.ambil_roi_detail(frame, lm)["kotak"]
+
+
+def test_kotak_skala_lebih_besar():
+    lm = titik_tiruan({0: (320, 420), 5: (360, 300), 17: (272, 312)}, 640, 480)
+    frame = np.zeros((480, 640, 3), np.uint8)
+    a = palm.ambil_roi_detail(frame, lm, skala=1.0)["kotak"]
+    b = palm.ambil_roi_detail(frame, lm, skala=1.3)["kotak"]
+    lebar_a, lebar_b = a[2] - a[0], b[2] - b[0]
+    assert abs(lebar_b - 1.3 * lebar_a) <= 2
+    assert abs((a[0] + a[2]) / 2 - (b[0] + b[2]) / 2) <= 1  # same centre
+    assert abs((a[1] + a[3]) / 2 - (b[1] + b[3]) / 2) <= 1

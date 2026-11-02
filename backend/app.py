@@ -1,6 +1,7 @@
 """app.py - Flask API for scanning, collecting samples, and managing enrolled people."""
 import base64
 import logging
+import math
 import os
 import sys
 from collections import Counter
@@ -19,6 +20,7 @@ from pipeline import analisis, baca_frame
 from steps import susun_langkah
 
 BATAS_DEFAULT = 0.38
+ROI_SKALA_MIN, ROI_SKALA_MAX = 0.8, 1.5  # beyond 1.5 the box leaves the palm
 BATAS_MIN, BATAS_MAX = 0.10, 0.50
 BYTE_PER_SAMPEL = 128 * 128  # one sample is a 128x128 uint8 map
 JUMLAH_SAMPEL = 8
@@ -50,14 +52,27 @@ def _decode_sampel(item):
     return np.frombuffer(b, np.uint8).reshape(128, 128)
 
 
-def create_app(database_url=None, deteksi=palm.deteksi_tangan):
+def _skala_roi(nilai):
+    k = float(nilai)
+    if not ROI_SKALA_MIN <= k <= ROI_SKALA_MAX:
+        raise ValueError(f"ROI_SKALA harus antara {ROI_SKALA_MIN} dan {ROI_SKALA_MAX}, bukan {nilai}")
+    return k
+
+
+def create_app(database_url=None, deteksi=palm.deteksi_tangan, roi_skala=None):
     if database_url is None:
         load_dotenv(os.path.join(os.path.dirname(__file__), ".env"))
         database_url = os.environ.get("DATABASE_URL", DATABASE_DEFAULT)
+    roi_skala = _skala_roi(os.environ.get("ROI_SKALA", "1.0") if roi_skala is None else roi_skala)
 
     app = Flask(__name__)
     engine = buat_engine(database_url)
     log.info("database: %s", make_url(database_url).render_as_string(hide_password=True))
+    log.info("ukuran kotak ROI: %gx lebar telapak", roi_skala)
+
+    @app.get("/api/pengaturan")
+    def pengaturan():
+        return jsonify({"roi_skala": roi_skala, "batas_default": BATAS_DEFAULT})
 
     @app.post("/api/scan")
     def scan():
@@ -67,7 +82,7 @@ def create_app(database_url=None, deteksi=palm.deteksi_tangan):
             return _galat("Gambar tidak valid")
         batas = _batas(body.get("batas"))
 
-        a = analisis(frame, deteksi=deteksi)
+        a = analisis(frame, deteksi=deteksi, roi_skala=roi_skala)
         if a.gagal:
             return jsonify({
                 "langkah": susun_langkah(a),
@@ -77,10 +92,14 @@ def create_app(database_url=None, deteksi=palm.deteksi_tangan):
             })
 
         with Session(engine) as s:
-            galeri = muat_galeri(s)
+            semua = muat_galeri(s)
+        # Codes made with another ROI size are not comparable, so leave them out.
+        galeri = [g for g in semua if math.isclose(g["roi_skala"], roi_skala)]
         if not galeri:
             jarak = []
-            hasil = {"status": "tidak_dikenal", "pesan": "Belum ada yang terdaftar"}
+            pesan = ("Belum ada yang terdaftar" if not semua else
+                     f"Belum ada yang terdaftar dengan ukuran kotak {roi_skala:g}×. Daftar ulang dulu.")
+            hasil = {"status": "tidak_dikenal", "pesan": pesan}
         else:
             jarak = sorted(
                 ({"telapak_id": g["telapak_id"], "orang_id": g["orang_id"], "nama": g["nama"],
@@ -99,7 +118,7 @@ def create_app(database_url=None, deteksi=palm.deteksi_tangan):
             log.info("scan: %s, terdekat %s (%s) jarak=%.3f, batas=%.2f", hasil["status"],
                      jarak[0]["nama"], jarak[0]["sisi"], jarak[0]["jarak"], batas)
         else:
-            log.info("scan: %s (belum ada yang terdaftar)", hasil["status"])
+            log.info("scan: %s (%s)", hasil["status"], hasil["pesan"])
         return jsonify({"langkah": susun_langkah(a, jarak=jarak, batas=batas),
                         "jarak": jarak, "batas": batas, "hasil": hasil})
 
@@ -109,7 +128,7 @@ def create_app(database_url=None, deteksi=palm.deteksi_tangan):
         frame = baca_frame(body.get("frame", ""))
         if frame is None:
             return _galat("Gambar tidak valid")
-        a = analisis(frame, deteksi=deteksi)
+        a = analisis(frame, deteksi=deteksi, roi_skala=roi_skala)
         if a.gagal:
             log.info("sampel: ditolak, %s", a.gagal)
             return jsonify({"valid": False, "pesan": a.gagal, "sisi": None, "kode": None})
@@ -159,7 +178,7 @@ def create_app(database_url=None, deteksi=palm.deteksi_tangan):
             elif s.get(Orang, orang_id) is None:
                 return _galat("Orang tidak ditemukan", 404)
             try:
-                simpan_telapak(s, orang_id, sisi, kode, ganti=ganti)
+                simpan_telapak(s, orang_id, sisi, kode, ganti=ganti, roi_skala=roi_skala)
             except TelapakSudahAda:
                 s.rollback()
                 return _galat(f"Tangan {sisi} sudah terdaftar. Ganti data lama?", 409,
@@ -204,7 +223,7 @@ if __name__ == "__main__":
                         format="%(asctime)s %(levelname)s [%(name)s] %(message)s")
     try:
         app = create_app()
-    except DatabaseTidakTersedia as e:
+    except (DatabaseTidakTersedia, ValueError) as e:
         print(e)
         sys.exit(1)
     app.run(port=5000)

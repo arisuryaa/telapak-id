@@ -68,7 +68,8 @@ def susun_langkah(a, jarak=None, batas=None):
             "no": 3, "judul": "Telapak diluruskan",
             "penjelasan": "Gambar diputar agar garis pangkal jari mendatar, lalu kotak telapak diambil.",
             "gambar": [{"label": "Diluruskan + kotak ROI", "src": ke_data_url(diluruskan, ".jpg")}],
-            "angka": {"sudut putar": f"{a.roi_detail['sudut']:.1f}°"},
+            "angka": {"sudut putar": f"{a.roi_detail['sudut']:.1f}°",
+                      "ukuran kotak": f"{a.roi_skala:g}× lebar telapak"},
         })
         langkah.append({
             "no": 4, "judul": "ROI abu-abu",

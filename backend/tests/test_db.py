@@ -71,3 +71,30 @@ def test_url_server_tanpa_database():
 def test_pesan_galat_menyertakan_detail():
     with pytest.raises(DatabaseTidakTersedia, match="Detail:"):
         buat_engine("mysql+pymysql://root:@127.0.0.1:1/telapak_id")
+
+
+def test_skala_roi_tersimpan(s):
+    o = tambah_orang(s, "dewa", 21, "mahasiswa")
+    simpan_telapak(s, o.id, "kanan", KODE, roi_skala=1.3)
+    simpan_telapak(s, o.id, "kiri", KODE)
+    s.commit()
+    skala = {g["sisi"]: g["roi_skala"] for g in muat_galeri(s)}
+    assert skala == {"kanan": 1.3, "kiri": 1.0}
+    assert ambil_orang(s, o.id)["skala_tangan"] == {"kanan": 1.3, "kiri": 1.0}
+
+
+def test_migrasi_kolom_skala(tmp_path):
+    # A database created before this column existed gets it added on startup.
+    import sqlite3
+    from sqlalchemy import inspect
+    path = tmp_path / "lama.db"
+    con = sqlite3.connect(path)
+    con.execute("CREATE TABLE orang (id INTEGER PRIMARY KEY, nama VARCHAR(100), umur INTEGER, status VARCHAR(9), dibuat_pada DATETIME)")
+    con.execute("CREATE TABLE telapak (id INTEGER PRIMARY KEY, orang_id INTEGER, sisi VARCHAR(5), kode BLOB, dibuat_pada DATETIME)")
+    con.execute("INSERT INTO orang VALUES (1, 'lama', 30, 'dosen', '2026-11-01 10:00:00')")
+    con.execute("INSERT INTO telapak VALUES (1, 1, 'kanan', ?, '2026-11-01 10:00:00')", (KODE.tobytes(),))
+    con.commit(); con.close()
+    engine = buat_engine(f"sqlite:///{path}")
+    assert "roi_skala" in [c["name"] for c in inspect(engine).get_columns("telapak")]
+    with Session(engine) as sess:
+        assert muat_galeri(sess)[0]["roi_skala"] == 1.0

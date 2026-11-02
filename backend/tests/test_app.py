@@ -129,3 +129,29 @@ def test_api_mencatat_log(client, caplog):
     assert "tersimpan: orang_id=1 sisi=kanan" in caplog.text
     assert "scan: dikenali, terdekat dewa (kanan) jarak=0.000" in caplog.text
     assert "POST /api/orang -> 400: Umur harus angka" in caplog.text
+
+
+def test_pengaturan_dan_skala_berbeda(client):
+    assert client.get("/api/pengaturan").get_json()["roi_skala"] == 1.0
+    s = sampel_valid(client)
+    client.post("/api/orang", json=body_daftar(s["kode"]))
+    besar = create_app("sqlite://", deteksi=detektor_palsu, roi_skala=1.3).test_client()
+    assert besar.get("/api/pengaturan").get_json()["roi_skala"] == 1.3
+    s2 = besar.post("/api/sampel", json={"frame": FRAME}).get_json()
+    assert s2["valid"]
+    besar.post("/api/orang", json=body_daftar(s2["kode"], nama="lama"))
+    # each test app has its own in-memory database; a 1.3x enrollment matches a 1.3x scan
+    r = besar.post("/api/scan", json={"frame": FRAME, "batas": 0.38}).get_json()
+    assert r["hasil"]["status"] == "dikenali"
+
+
+def test_scan_abaikan_data_skala_lain(tmp_path):
+    url = f"sqlite:///{tmp_path / 'campur.db'}"
+    lama = create_app(url, deteksi=detektor_palsu, roi_skala=1.0).test_client()
+    s = lama.post("/api/sampel", json={"frame": FRAME}).get_json()
+    lama.post("/api/orang", json=body_daftar(s["kode"]))
+    baru = create_app(url, deteksi=detektor_palsu, roi_skala=1.3).test_client()
+    r = baru.post("/api/scan", json={"frame": FRAME, "batas": 0.38}).get_json()
+    assert r["hasil"]["status"] == "tidak_dikenal"
+    assert r["hasil"]["pesan"] == "Belum ada yang terdaftar dengan ukuran kotak 1.3×. Daftar ulang dulu."
+    assert r["jarak"] == []

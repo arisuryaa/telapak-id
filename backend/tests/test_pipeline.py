@@ -67,3 +67,14 @@ def test_analisis_mencatat_log(caplog):
     assert "roi_terang=" in caplog.text and "roi_tajam=" in caplog.text
     assert "hasil=lolos" in caplog.text
     assert "hasil=gagal: Tunjukkan telapak tangan" in caplog.text
+
+
+def test_analisis_dengan_skala_roi(caplog):
+    import logging
+    with caplog.at_level(logging.INFO, logger="telapak"):
+        a = analisis(frame_uji(), deteksi=lambda f: (lm("terbuka_kanan"), "Left"), roi_skala=1.3)
+    x1, _, x2, _ = a.roi_detail["kotak"]
+    assert a.roi_skala == 1.3 and x2 - x1 > 100  # palm width is about 89 px at 1.0x
+    assert "roi_skala=1.3" in caplog.text
+    langkah3 = susun_langkah(a)[2]
+    assert langkah3["angka"]["ukuran kotak"] == "1.3× lebar telapak"
