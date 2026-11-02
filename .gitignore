@@ -11,4 +11,4 @@ frontend/public/mediapipe/
 
 # Local data and agent scratch files
 registered_data/
-.superpowers/
+.superpowers
