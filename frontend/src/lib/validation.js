@@ -22,11 +22,17 @@ const PASANGAN_JARI = [
 const px = (lm, i, w, h) => ({ x: lm[i].x * w, y: lm[i].y * h });
 const jarak = (a, b) => Math.hypot(a.x - b.x, a.y - b.y);
 
+// MediaPipe Tasks (this browser library) reports the real hand on an unmirrored
+// frame. The Python backend uses the legacy API, which assumes a mirrored image,
+// so its mapping is the opposite ("Left" -> kanan). See backend/validation.py.
+export const LABEL_KANAN = "Right";
+
 export function sisiDariLabel(label) {
-  return label === "Left" ? "kanan" : "kiri";
+  return label === LABEL_KANAN ? "kanan" : "kiri";
 }
 
-// Debug helper: the sign of this cross product decides palm vs back of hand.
+// Cross product of wrist->index base and wrist->little base (image y points down).
+// Its sign, together with the hand side, tells palm from back of hand.
 export function silangTelapak(lm, w, h) {
   const p0 = px(lm, 0, w, h);
   const a = px(lm, 5, w, h);
@@ -46,14 +52,7 @@ export function jariTerbuka(lm, w, h) {
 }
 
 export function menghadapKamera(lm, sisi, w, h) {
-  const p0 = px(lm, 0, w, h);
-  const p5 = px(lm, 5, w, h);
-  const p17 = px(lm, 17, w, h);
-  const ax = p5.x - p0.x;
-  const ay = p5.y - p0.y;
-  const bx = p17.x - p0.x;
-  const by = p17.y - p0.y;
-  const z = ax * by - ay * bx;
+  const z = silangTelapak(lm, w, h);
   return sisi === "kanan" ? z < 0 : z > 0;
 }
 
@@ -93,7 +92,8 @@ export function periksa(lm, label, lmSebelum, w, h) {
   if (!lm) {
     return {
       terdeteksi: false, jari: false, menghadap: false, jarak: false,
-      diam: false, semua: false, sisi: null, pesan: "Letakkan telapak di depan kamera",
+      diam: false, semua: false, sisi: null, label: null, silang: null,
+      pesan: "Letakkan telapak di depan kamera",
     };
   }
   const sisi = sisiDariLabel(label);
@@ -111,5 +111,8 @@ export function periksa(lm, label, lmSebelum, w, h) {
   else if (!jarakOk) pesan = "Atur jarak tangan ke kamera";
   else if (!diam) pesan = "Tahan tangan agar diam";
 
-  return { terdeteksi: true, jari, menghadap, jarak: jarakOk, diam, semua, sisi, pesan };
+  return {
+    terdeteksi: true, jari, menghadap, jarak: jarakOk, diam, semua, sisi, label,
+    silang: silangTelapak(lm, w, h), pesan,
+  };
 }
