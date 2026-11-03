@@ -1,6 +1,6 @@
 # Telapak ID: Pengenalan Identitas dari Pola Telapak Tangan (Computer Vision)
 
-Prototipe pembelajaran berbasis web: seseorang **mendaftarkan telapak tangannya**, lalu sistem **mengenalinya kembali** lewat webcam. Tidak ada pelatihan model dan tidak ada dataset yang dibutuhkan untuk menjalankan demo.
+Prototipe pembelajaran berbasis web: seseorang **mendaftarkan telapak tangannya**, lalu sistem **mengenalinya kembali** lewat webcam.
 
 Halaman scan menampilkan kerangka tangan, kotak area telapak yang diproses, dan FPS. Setelah foto diambil, halaman hasil menampilkan **8 langkah pemrosesan** dengan gambar asli dari tiap tahap, lalu detail orang yang dikenali.
 
@@ -29,14 +29,13 @@ registered_data/          (tidak dipakai lagi; sisa data versi terminal, boleh d
 ## 2. Kebutuhan
 
 - Windows 10/11, Python 3.10 (disarankan 3.10 atau 3.11), Node.js 20 atau lebih baru.
-- MySQL 8 dari **Laragon** yang berjalan di laptop (user `root`, tanpa password, port 3306).
-- Koneksi internet hanya diperlukan **sekali** saat instalasi, untuk mengunduh model tangan MediaPipe.
+- MySQL 8.
 
 Catatan: `mediapipe` dikunci ke **0.10.14** karena versi lebih baru tidak lagi menyertakan antarmuka `mp.solutions` yang dipakai backend.
 
 ## 3. Cara menjalankan
 
-Nyalakan MySQL di Laragon, lalu:
+Nyalakan MySQL, lalu:
 
 ```bash
 # 1. Backend
