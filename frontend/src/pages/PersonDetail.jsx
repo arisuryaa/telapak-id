@@ -1,7 +1,16 @@
 import { useEffect, useState } from "react";
 import { Link, useLocation, useParams } from "react-router";
+import { IkonCentang, Kartu, Pesan, tombol } from "../components/ui.jsx";
 import { ambilOrang } from "../lib/api.js";
 import { formatTangan } from "../lib/format.js";
+
+const inisial = (nama) =>
+  nama
+    .split(/\s+/)
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((k) => k[0].toUpperCase())
+    .join("");
 
 export default function PersonDetail() {
   const { id } = useParams();
@@ -15,7 +24,7 @@ export default function PersonDetail() {
     setGalat(null);
     ambilOrang(id)
       .then((data) => !batal && setOrang(data))
-      .catch((err) => !batal && setGalat(err.status === 404 ? "Orang tidak ditemukan" : err.message));
+      .catch((err) => !batal && setGalat(err.status === 404 ? "Orang ini tidak ditemukan. Mungkin datanya sudah dihapus." : err.message));
     return () => {
       batal = true;
     };
@@ -23,38 +32,50 @@ export default function PersonDetail() {
 
   if (galat) {
     return (
-      <div className="space-y-3">
-        <p className="text-red-700">{galat}</p>
-        <Link to="/" className="underline">Kembali ke scan</Link>
+      <div className="mx-auto max-w-xl space-y-4">
+        <Pesan jenis="galat">{galat}</Pesan>
+        <Link to="/" className={tombol.kedua}>Kembali ke scan</Link>
       </div>
     );
   }
-  if (!orang) return <p className="text-slate-500">Memuat…</p>;
+  if (!orang) return <p className="text-muted">Memuat…</p>;
+
+  const rincian = [
+    ["Umur", `${orang.umur} tahun`],
+    ["Status", orang.status],
+    ["Tangan terdaftar", formatTangan(orang)],
+  ];
 
   return (
-    <div className="space-y-4">
-      <div className="rounded-xl border border-slate-200 bg-white p-6">
-        <h1 className="text-2xl font-semibold">{orang.nama}</h1>
-        <dl className="mt-4 grid grid-cols-2 gap-x-6 gap-y-3 text-sm sm:max-w-md">
-          <dt className="text-slate-500">Umur</dt>
-          <dd>{orang.umur} tahun</dd>
-          <dt className="text-slate-500">Status</dt>
-          <dd className="capitalize">{orang.status}</dd>
-          <dt className="text-slate-500">Tangan terdaftar</dt>
-          <dd>{formatTangan(orang)}</dd>
+    <div className="mx-auto max-w-2xl space-y-6">
+      <Kartu className="overflow-hidden">
+        <div className="flex flex-wrap items-center gap-5 p-6 sm:p-8">
+          <span className="flex h-20 w-20 shrink-0 items-center justify-center rounded-3xl bg-brand text-2xl font-extrabold text-white shadow-float">
+            {inisial(orang.nama)}
+          </span>
+          <div className="min-w-0">
+            <h1 className="text-3xl font-extrabold tracking-tight text-ink">{orang.nama}</h1>
+            <p className="mt-1 text-muted capitalize">{orang.status}</p>
+          </div>
+        </div>
+        <dl className="grid border-t border-line sm:grid-cols-3">
+          {rincian.map(([k, v]) => (
+            <div key={k} className="border-line px-6 py-4 sm:border-r sm:last:border-r-0 sm:px-8">
+              <dt className="text-xs font-semibold text-muted">{k}</dt>
+              <dd className="mt-1 font-semibold text-ink capitalize">{v}</dd>
+            </div>
+          ))}
         </dl>
         {state?.sisi && (
-          <p className="mt-5 rounded-lg bg-green-50 p-3 text-sm text-green-800">
-            Cocok dengan tangan {state.sisi}, jarak {state.jarak.toFixed(3)}.
-          </p>
+          <div className="flex items-center gap-3 border-t border-line bg-ok-soft px-6 py-4 text-sm font-medium text-ok sm:px-8">
+            <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-ok text-white">
+              <IkonCentang className="h-3.5 w-3.5" />
+            </span>
+            Cocok dengan tangan {state.sisi} pada scan terakhir, jarak {state.jarak.toFixed(3)}.
+          </div>
         )}
-      </div>
-      <Link
-        to="/"
-        className="inline-block rounded-lg bg-slate-900 px-4 py-2 text-sm font-medium text-white hover:bg-slate-700"
-      >
-        Scan lagi
-      </Link>
+      </Kartu>
+      <Link to="/" className={tombol.utama}>Scan lagi</Link>
     </div>
   );
 }

@@ -1,10 +1,79 @@
 @import "tailwindcss";
 
+/* Design tokens: palette taken from the startup reference (bright blue on lavender-white). */
+@theme {
+  --font-sans: "Plus Jakarta Sans", ui-sans-serif, system-ui, sans-serif;
+
+  --color-brand: #2f6bef;
+  --color-brand-strong: #2458d6;
+  --color-brand-soft: #e8eeff;
+  --color-lilac: #e6e8fb;
+  --color-ink: #141a33;
+  --color-muted: #5e6684;
+  --color-line: #e3e7f3;
+  --color-canvas: #f2f4fb;
+  --color-ok: #16a46c;
+  --color-ok-soft: #e3f6ed;
+  --color-warn: #c98200;
+  --color-warn-bar: #f0a20b;
+  --color-warn-soft: #fdf3dc;
+  --color-err: #d93f3f;
+  --color-err-soft: #fdeaea;
+
+  --shadow-card: 0 1px 2px rgb(20 26 51 / 0.04), 0 12px 32px -12px rgb(47 107 239 / 0.18);
+  --shadow-float: 0 20px 48px -16px rgb(47 107 239 / 0.35);
+}
+
 body {
-  background-color: #f1f5f9;
-  color: #0f172a;
+  background-color: var(--color-canvas);
+  color: var(--color-ink);
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Faint tile grid behind the top of every page, echoing the reference backdrop. */
+.latar-grid {
+  background-image:
+    linear-gradient(to right, rgb(47 107 239 / 0.07) 1px, transparent 1px),
+    linear-gradient(to bottom, rgb(47 107 239 / 0.07) 1px, transparent 1px);
+  background-size: 56px 56px;
+  mask-image: linear-gradient(to bottom, black 0%, transparent 70%);
 }
 
 .pixelated {
   image-rendering: pixelated;
+}
+
+:focus-visible {
+  outline: 3px solid rgb(47 107 239 / 0.45);
+  outline-offset: 2px;
+}
+
+/* Camera border pulse when a sample is accepted. */
+@keyframes kilat {
+  0% { box-shadow: inset 0 0 0 6px rgb(47 107 239 / 0.95); }
+  100% { box-shadow: inset 0 0 0 0 rgb(47 107 239 / 0); }
+}
+.animasi-kilat {
+  animation: kilat 600ms ease-out forwards;
+}
+
+/* A dial segment popping in when it fills. */
+@keyframes isi {
+  0% { opacity: 0.2; stroke-width: 10; }
+  60% { stroke-width: 16; }
+  100% { opacity: 1; stroke-width: 12; }
+}
+.animasi-isi {
+  animation: isi 450ms ease-out;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .animasi-kilat,
+  .animasi-isi {
+    animation: none;
+  }
+  .animate-spin {
+    animation-duration: 3s;
+  }
 }

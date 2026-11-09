@@ -2,6 +2,7 @@ import { useState } from "react";
 import { Link, useNavigate } from "react-router";
 import PalmCamera from "../components/PalmCamera.jsx";
 import ProcessingPanel from "../components/ProcessingPanel.jsx";
+import { JudulHalaman, Pesan } from "../components/ui.jsx";
 import { scan } from "../lib/api.js";
 
 const BATAS_DEFAULT = 0.38;
@@ -45,51 +46,55 @@ export default function Scan() {
     }
   }
 
+  const persen = ((batas - 0.1) / 0.4) * 100;
+
   return (
-    <div className="space-y-4">
-      <div className="flex flex-wrap items-end justify-between gap-4">
-        <div>
-          <h1 className="text-xl font-semibold">Scan telapak</h1>
-          <p className="text-sm text-slate-600">Letakkan telapak di dalam kamera. Foto diambil otomatis.</p>
-        </div>
-        <div className="text-sm">
-          <label className="flex items-center gap-3">
-            <span className="whitespace-nowrap">Batas kecocokan {batas.toFixed(2)}</span>
-            <input
-              type="range"
-              min="0.1"
-              max="0.5"
-              step="0.01"
-              value={batas}
-              onChange={ubahBatas}
-              className="w-40"
-            />
-          </label>
-          <p className="mt-1 max-w-xs text-xs text-slate-500">
-            Dikenali jika jarak terkecil di bawah batas. Lebih kecil = lebih ketat.
-          </p>
-        </div>
-      </div>
+    <div className="space-y-8">
+      <JudulHalaman
+        judul="Siapa pemilik telapak ini?"
+        keterangan="Tunjukkan telapak tangan ke kamera. Foto diambil otomatis, lalu sistem mencocokkannya dengan data terdaftar."
+      >
+        <label className="w-full max-w-xs rounded-2xl border border-white bg-white/80 p-4 text-sm shadow-card sm:w-72">
+          <span className="flex items-baseline justify-between">
+            <span className="font-semibold text-ink">Batas kecocokan</span>
+            <span className="text-base font-bold text-brand tabular-nums">{batas.toFixed(2)}</span>
+          </span>
+          <input
+            type="range"
+            min="0.1"
+            max="0.5"
+            step="0.01"
+            value={batas}
+            onChange={ubahBatas}
+            className="mt-3 h-2 w-full cursor-pointer appearance-none rounded-full accent-brand"
+            style={{ background: `linear-gradient(to right, #2f6bef ${persen}%, #e6e8fb ${persen}%)` }}
+          />
+          <span className="mt-2 flex justify-between text-xs text-muted">
+            <span>Lebih ketat</span>
+            <span>Lebih longgar</span>
+          </span>
+        </label>
+      </JudulHalaman>
 
       {/* Keep the camera mounted (hidden) so it does not reload the model after an error. */}
       <div className={memproses ? "hidden" : ""}>
-        <PalmCamera mode="sekali" onAmbil={onAmbil} aktif={!memproses} />
+        <PalmCamera mode="sekali" onAmbil={onAmbil} aktif={!memproses} pesanTahan="Tahan posisi ini…" />
       </div>
       {memproses && (
         <ProcessingPanel
           foto={foto}
-          judul="Memproses foto…"
+          judul="Mencocokkan telapak…"
           keterangan="Foto sudah diambil. Tangan boleh diturunkan."
         />
       )}
       {galat && (
-        <p className="rounded-lg bg-red-50 p-3 text-sm text-red-700">
-          {galat}{" "}
-          <span className="text-slate-600">Silakan coba lagi.</span>
-        </p>
+        <Pesan jenis="galat">
+          {galat} Tunjukkan telapak sekali lagi untuk mencoba ulang.
+        </Pesan>
       )}
-      <p className="text-sm text-slate-500">
-        Belum terdaftar? <Link to="/daftar" className="underline">Daftar di sini</Link>.
+      <p className="text-sm text-muted">
+        Belum terdaftar?{" "}
+        <Link to="/daftar" className="font-semibold text-brand hover:underline">Daftarkan telapakmu</Link>
       </p>
     </div>
   );
