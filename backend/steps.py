@@ -83,6 +83,8 @@ def susun_langkah(a, jarak=None, batas=None):
         diluruskan = a.roi_detail["rot"].copy()
         cv2.rectangle(diluruskan, (x1, y1), (x2, y2), (0, 255, 0), 3)
         sebelum = _gambar_sebelum_diluruskan(a.frame, a.roi_detail)
+        atas, bawah = palm.batas_vertikal(a.roi_skala)
+        tinggi = bawah - atas
         # the same ruler line (index base to little-finger base) on the rotated photo: now horizontal
         M = a.roi_detail["putar"]
         p5r = tuple(int(v) for v in M @ np.array([*a.roi_detail["p5"], 1.0]))
@@ -98,7 +100,8 @@ def susun_langkah(a, jarak=None, batas=None):
                 {"label": "Sesudah diluruskan", "src": ke_data_url(diluruskan, ".jpg")},
             ],
             "angka": {"sudut putar": f"{a.roi_detail['sudut']:.1f}°",
-                      "ukuran kotak": f"{a.roi_skala:g}× lebar telapak"},
+                      "ukuran kotak": f"{a.roi_skala:g}× lebar telapak",
+                      "tinggi kotak": f"{tinggi:.2f}× lebar telapak"},
         })
         potongan = a.roi_detail["potongan"]
         langkah.append({
@@ -119,23 +122,52 @@ def susun_langkah(a, jarak=None, batas=None):
             "gambar": [{"label": "Setelah CLAHE", "src": ke_data_url(clahe)}],
             "angka": {"rata-rata": round(float(clahe.mean()), 1), "simpangan": round(float(clahe.std()), 1)},
         })
-        respons = a.kode_detail["respons"]
-        langkah.append({
-            "no": 6, "judul": "Filter Gabor 6 arah",
-            "penjelasan": "Enam filter Gabor mencari garis ke enam arah. Terang berarti garis searah dengan filter.",
-            "gambar": [{"label": LABEL_ARAH[j], "src": ke_data_url(_skala_0_255(respons[j]))}
-                       for j in range(palm.GABOR["arah"])],
-            "angka": {"ukuran filter": palm.GABOR["ukuran"], "arah": palm.GABOR["arah"]},
-        })
         warna = np.array([_hex_ke_bgr(c) for c in WARNA_KODE], np.uint8)
-        peta = warna[a.kode_detail["kode"]]
-        langkah.append({
-            "no": 7, "judul": "Competitive Code",
-            "penjelasan": "Di tiap piksel, arah dengan respons terkuat menjadi kodenya. Peta inilah yang disimpan dan dicocokkan.",
-            "gambar": [{"label": "Peta kode", "src": ke_data_url(peta)}],
-            "angka": {"jumlah arah": palm.GABOR["arah"]},
-            "legenda": [{"arah": LABEL_ARAH[j], "warna": WARNA_KODE[j]} for j in range(6)],
-        })
+        legenda = [{"arah": LABEL_ARAH[j], "warna": WARNA_KODE[j]} for j in range(6)]
+        if a.metode == "canny":
+            kd = a.kode_detail
+            langkah.append({
+                "no": 6, "judul": "Canny: blur dan gradien",
+                "penjelasan": ("Foto diperhalus dengan Gaussian blur agar bintik kecil tidak ikut dihitung. Lalu di setiap "
+                               "titik dihitung seberapa tajam perubahan terang-gelapnya (gradien Sobel). Terang berarti "
+                               "perubahannya tajam, yaitu calon tepi."),
+                "gambar": [{"label": "Setelah blur", "src": ke_data_url(kd["halus"])},
+                           {"label": "Kekuatan gradien", "src": ke_data_url(kd["gradien"])}],
+                "angka": {"sigma blur": kd["sigma"], "ukuran Sobel": "3×3"},
+            })
+            kode = kd["kode"]
+            peta = np.zeros(kode.shape + (3,), np.uint8)
+            peta[kode > 0] = warna[kode[kode > 0] - 1]
+            jumlah_tepi = int((kode > 0).sum())
+            langkah.append({
+                "no": 7, "judul": "Tepi Canny dan arahnya",
+                "penjelasan": ("Canny menipiskan tepi menjadi garis setebal satu piksel, lalu memilih tepi yang kuat dengan "
+                               "dua ambang (ambang rendah hanya dipakai jika tersambung ke tepi yang kuat). Setiap piksel "
+                               "tepi diberi warna menurut arah garisnya (6 arah, sama seperti Gabor). Peta arah inilah yang "
+                               "disimpan dan dicocokkan."),
+                "gambar": [{"label": "Tepi Canny", "src": ke_data_url(kd["tepi"] * 255)},
+                           {"label": "Arah tepi", "src": ke_data_url(peta)}],
+                "angka": {"ambang tinggi": round(kd["ambang_tinggi"], 1), "ambang rendah": round(kd["ambang_rendah"], 1),
+                          "piksel tepi": jumlah_tepi, "kepadatan tepi": f"{100 * jumlah_tepi / kode.size:.1f}%"},
+                "legenda": legenda,
+            })
+        else:
+            respons = a.kode_detail["respons"]
+            langkah.append({
+                "no": 6, "judul": "Filter Gabor 6 arah",
+                "penjelasan": "Enam filter Gabor mencari garis ke enam arah. Terang berarti garis searah dengan filter.",
+                "gambar": [{"label": LABEL_ARAH[j], "src": ke_data_url(_skala_0_255(respons[j]))}
+                           for j in range(palm.GABOR["arah"])],
+                "angka": {"ukuran filter": palm.GABOR["ukuran"], "arah": palm.GABOR["arah"]},
+            })
+            peta = warna[a.kode_detail["kode"]]
+            langkah.append({
+                "no": 7, "judul": "Competitive Code",
+                "penjelasan": "Di tiap piksel, arah dengan respons terkuat menjadi kodenya. Peta inilah yang disimpan dan dicocokkan.",
+                "gambar": [{"label": "Peta kode", "src": ke_data_url(peta)}],
+                "angka": {"jumlah arah": palm.GABOR["arah"]},
+                "legenda": legenda,
+            })
     if jarak is not None:
         terkecil = min((d["jarak"] for d in jarak), default=None)
         langkah.append({

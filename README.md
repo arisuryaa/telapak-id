@@ -73,8 +73,8 @@ Browser perlu izin akses kamera. Halaman Scan dan Daftar tidak berjalan tanpa ka
 | 3 | Telapak diluruskan | `getRotationMatrix2D`, `warpAffine` | Diputar sampai garis pangkal jari mendatar |
 | 4 | ROI abu-abu | slicing, `cvtColor`, `resize` | Kotak tengah telapak, 128×128 |
 | 5 | CLAHE dan normalisasi | CLAHE, normalisasi | Garis tipis dipertegas |
-| 6 | Filter Gabor 6 arah | `getGaborKernel`, `filter2D` | Respons tiap arah (0°–150°) |
-| 7 | Competitive Code | `argmin` | Setiap piksel diberi arah pemenang (0–5) |
+| 6 | Filter Gabor 6 arah (`METODE=gabor`) atau Canny: blur dan gradien (`METODE=canny`) | `getGaborKernel`, `filter2D` atau `GaussianBlur`, `Sobel` | Gabor: respons tiap arah (0°–150°). Canny: foto diperhalus lalu kekuatan gradiennya dihitung |
+| 7 | Competitive Code (Gabor) atau tepi Canny dan arahnya (Canny) | `argmin` atau `Canny` | Gabor: tiap piksel diberi arah pemenang (0–5). Canny: tiap piksel tepi diberi arah garisnya (1–6, 0 = bukan tepi) |
 | 8 | Pencocokan | NumPy | Jarak sudut ke sampel tiap orang terdaftar, toleransi geser ±3 piksel |
 
 Pengelompokan untuk laporan: tahap 2–4 = *preprocessing*, tahap 5–6 = *feature extraction*, tahap 7–8 = *matching*.
@@ -85,14 +85,30 @@ Gambar pada halaman hasil adalah **data yang sama** dengan yang dipakai untuk me
 
 Kotak jurnal (1,0×) adalah persegi selebar telapak (jarak pangkal telunjuk ke pangkal kelingking), dimulai 0,15× lebar di bawah garis pangkal jari. Kotak ini hanya mengambil tengah telapak, karena tepi telapak (pangkal ibu jari, pergelangan) bentuknya berubah-ubah antar foto.
 
-Untuk perbandingan, ukuran kotak bisa diubah di `backend/.env`, misalnya `ROI_SKALA=1.3`. Kotak diperbesar merata di sekitar titik tengah yang sama. Rentang yang diizinkan 0,8–1,5; di atas 1,5 kotak keluar dari telapak dan ikut mengambil latar belakang.
+Untuk perbandingan, ukuran kotak bisa diubah di `backend/.env`, misalnya `ROI_SKALA=1.3`. `ROI_SKALA` adalah **lebar** kotak dalam lebar telapak. Rentang yang diizinkan 0,8–1,5; di atas 1,5 kotak keluar dari telapak dan ikut mengambil latar belakang.
 
-- Setiap tangan menyimpan ukuran kotak yang dipakai saat mendaftar. Scan hanya membandingkan dengan data yang ukurannya sama, karena kode dari ukuran berbeda tidak bisa dibandingkan.
-- Setelah mengubah `ROI_SKALA`, restart backend dan daftar ulang (pilih orangnya, lalu setujui penggantian).
+- **Di bawah 1,0**, kotak mengecil merata di sekitar titik tengah yang sama.
+- **Di atas 1,0**, kotak melebar ke samping dan tepi atasnya naik mendekati garis pangkal jari (tepat di garis itu pada 1,3× atau lebih), tetapi tepi bawahnya tetap di 1,15× lebar, yaitu sekitar pergelangan. Kotak jadi lebih lebar daripada tinggi (misalnya 1,3 × 1,15 pada 1,3×) dan tetap diperkecil ke 128×128. Rumusnya ada di `batas_vertikal()` di `backend/palm.py` dan `batasVertikal()` di `frontend/src/lib/validation.js`, dan keduanya harus sama.
+
+- Setiap tangan menyimpan ukuran dan **versi bentuk** kotak yang dipakai saat mendaftar. Scan hanya membandingkan dengan data yang ukuran dan bentuknya sama, karena kode dari kotak yang berbeda tidak bisa dibandingkan. Tangan yang didaftarkan dengan 1,3× sebelum bentuk ini (kotak yang tumbuh merata sampai melewati pergelangan) dianggap berbeda dan harus didaftar ulang.
+- Setelah mengubah `ROI_SKALA` (atau `METODE`), restart backend dan daftar ulang (pilih orangnya, lalu setujui penggantian).
 - Halaman *Data terdaftar* menampilkan ukuran kotak setiap tangan, misalnya `kanan (1.3×)`.
 
-### Kenapa tidak memakai Canny?
-Canny mencari tepi, sehingga satu garis tipis sering terbelah menjadi dua tepi sejajar, dan hasilnya hanya "ada tepi / tidak" tanpa informasi **arah**. Filter Gabor menghasilkan arah garis di tiap titik, yang dipakai untuk pencocokan, dan sesuai dengan metode di jurnal palmprint.
+### Metode pengenalan: Canny atau Gabor (`METODE`)
+
+Aplikasi punya dua cara mengubah ROI menjadi pola yang dicocokkan. Pilih di `backend/.env`, lalu restart backend:
+
+```
+METODE=canny     # tepi Canny yang menyimpan arah tiap tepi (sedang dipakai)
+METODE=gabor     # kode 6 filter Gabor (metode semula, metode inti di jurnal rujukan)
+```
+
+- **Canny + arah.** Canny mencari tepi, dan satu garis tipis sering menjadi dua tepi sejajar. Canny sendiri menghitung arah gradien untuk menipiskan tepi. Arah itu disimpan di tiap piksel tepi (6 kelompok, 30° per kelompok), dan dua tepi hanya dianggap cocok jika letaknya berdekatan (toleransi 1 piksel, geser ±3 piksel) dan arahnya mirip. Parameter: blur sigma 1,5 dan ambang atas di persentil ke-95 gradien (`SIGMA`, `PERSEN` di `backend/canny.py`).
+- **Gabor.** 6 filter dengan arah berbeda, lalu tiap piksel diberi arah pemenang. Lihat bagian 5.
+- Hasil pengujian pada foto sendiri (satu orang, sekitar 33 scan) menunjukkan Gabor lebih akurat: EER 0% dibanding 3 sampai 9% untuk Canny + arah dan 9 sampai 18% untuk Canny tanpa arah. Datanya masih sedikit, jadi ulangi dengan lebih banyak orang (bagian 10).
+- Kode dari dua metode **tidak bisa dibandingkan**. Setiap tangan menyimpan metode yang dipakai saat mendaftar, dan scan hanya memakai tangan yang metodenya sama. Tangan dari metode lain tidak dihapus dan dipakai lagi kalau Anda kembali ke metode itu. Setelah mengganti `METODE`, daftar ulang (pilih orangnya, lalu setujui penggantian).
+- **Skala jarak berbeda.** Jarak Gabor acak sekitar 0,5. Jarak Canny acak sekitar 0,8 ke atas. Karena itu setiap metode punya batas bawaan dan rentang slider sendiri (`backend/metode.py`): Gabor 0,38 (0,10 sampai 0,50) dan Canny 0,75 (0,40 sampai 0,95). Batas Canny diambil dari data sedikit, jadi setel ulang dari pengujian Anda.
+- Halaman Hasil menampilkan tahapan sesuai metode: langkah 6 dan 7 berbeda, sisanya sama.
 
 ## 6. Validasi tangan
 
@@ -115,7 +131,7 @@ Garis tangan **tidak mengandung nama**. Sistem menyimpan **kode angka** (peta ar
 2. **Scan:** kode baru dihitung, lalu dibandingkan dengan semua kode yang tersimpan. Jarak ke satu orang = jarak ke sampel pendaftarannya yang paling mirip.
 3. **Keputusan:** orang dengan jarak terkecil dipilih. Jika jaraknya masih di atas **batas**, jawabannya "tidak dikenal".
 
-Skala jarak: 0 = identik, sekitar 0,5 = pola acak. Batas yang baik **harus disetel dari pengujian sendiri** (lihat bagian 10), bukan ditebak.
+Skala jarak: 0 = identik. Pola acak berjarak sekitar 0,5 pada Gabor dan sekitar 0,8 pada Canny (skala keduanya berbeda). Batas yang baik **harus disetel dari pengujian sendiri** (lihat bagian 10), bukan ditebak.
 
 ## 8. Privasi dan data
 
@@ -164,6 +180,40 @@ Tabel hasil (isi dari pengujian nyata):
 | Belum terdaftar | [ ] | [ ] | [ ] |
 
 Jika hasil kurang baik, urutan perbaikan: (1) cahaya merata dan latar polos, (2) periksa kotak area telapak di kamera, pastikan yang terpotong adalah tengah telapak dengan garis terlihat, (3) daftar dan scan di tempat serta kamera yang sama.
+
+### Membandingkan ukuran kotak ROI
+
+Dua skrip di `backend/tools/` membantu memilih `ROI_SKALA` berdasarkan data, bukan tebakan. Jalankan dari folder `backend`.
+
+```bash
+python tools/ambil_foto.py dewa_kanan          # ambil 20 foto telapak kanan dari webcam
+python tools/ambil_foto.py dewa_kiri
+python tools/ambil_foto.py budi_kanan          # tangan orang lain, sebagai pembanding
+python tools/bandingkan_skala.py data_uji      # bandingkan ukuran 1.0x sampai 1.5x
+```
+
+- `ambil_foto.py` membuka kamera. Tekan **SPASI** untuk mulai, lalu foto diambil otomatis tiap 2 detik. Geser tangan sedikit di antara foto. Foto disimpan di `backend/data_uji/<nama>/` dan **tidak ikut git** karena data biometrik. Hapus folder itu setelah selesai.
+- Butuh minimal 2 tangan (tangan kiri dan kanan Anda dihitung berbeda) dan sebaiknya 20 foto atau lebih per tangan.
+- `bandingkan_skala.py` meniru aplikasi: 8 foto pertama tiap tangan dipakai untuk mendaftar, sisanya untuk scan. Jarak scan ke satu tangan adalah jarak ke sampel terdekatnya. Hasilnya adalah tabel per ukuran: foto yang lolos pengecekan, jarak ke tangan yang sama dan ke tangan lain, **EER** (tingkat salah ketika salah tolak sama dengan salah terima), batas terbaik, serta salah tolak dan salah terima pada batas 0,38. Setiap ukuran dinilai dengan foto yang sama.
+- Pilihan lain: `--skala 1.0 1.3`, `--daftar 5`, `--batas 0.35`, `--csv hasil.csv`, dan `--detail` (daftar file yang ditolak beserta alasannya). Alasan penolakan selalu dihitung dan ditampilkan di bawah tabel.
+- Untuk uji yang lebih jujur, ambil foto pendaftaran dan foto uji di sesi berbeda (jalankan `ambil_foto.py` lagi untuk tangan yang sama; foto baru ditambahkan setelah yang lama).
+- Hasil dari beberapa orang dan puluhan foto adalah petunjuk, bukan bukti. Selisih kecil antar ukuran belum berarti.
+
+### Mencoba Canny sebagai pengganti Gabor
+
+`backend/tools/bandingkan_metode.py` membandingkan kode Gabor dan peta tepi Canny pada foto dan protokol yang sama (folder `data_uji` yang sama dengan di atas). Aplikasi sendiri memakai metode yang dipilih lewat `METODE` (bagian 5).
+
+```bash
+python tools/bandingkan_metode.py data_uji
+python tools/bandingkan_metode.py data_uji --sigma 1 1.5 2.5 --persen 90 95 --gambar gambar_canny
+```
+
+- Canny membuat peta tepi (1 di tepi, 0 di tempat lain) tanpa arah. Dua peta dibandingkan dari seberapa banyak tepi yang berdekatan (toleransi 1 piksel, geser ±3 piksel seperti Gabor), dan jarak ke satu tangan tetap jarak ke sampel terdekatnya.
+- Hasil Canny sangat bergantung pada kekuatan blur (`--sigma`) dan ambang (`--persen`), jadi beberapa kombinasi dicoba sekaligus.
+- `--arah` mencoba juga **Canny + arah**: Canny sudah menghitung arah gradien untuk memangkas tepi, dan arah itu (6 kelompok, 30° per kelompok) disimpan di tiap piksel tepi. Dua piksel tepi hanya dianggap cocok jika arahnya mirip. Lebih lambat, sekitar 30 detik untuk 60 foto.
+- Skala jarak Canny berbeda dari Gabor, jadi tabel membandingkan dengan **EER** dan **d'** (selisih kelompok "tangan sama" dan "tangan lain" dalam satuan simpangan baku), bukan jarak mentah.
+- `--gambar folder` menyimpan gambar ROI, hasil CLAHE, tepi Canny, dan kode Gabor untuk dilihat langsung. Folder `backend/gambar_canny/` tidak ikut git.
+- Parameter Canny dipilih dengan melihat data yang sama, jadi hasilnya sedikit lebih optimis daripada Gabor. Pakai minimal 30 scan uji sebelum memutuskan.
 
 ## 11. Keterbatasan
 

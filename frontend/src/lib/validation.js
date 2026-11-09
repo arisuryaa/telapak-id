@@ -57,7 +57,18 @@ export function menghadapKamera(lm, sisi, w, h) {
 }
 
 // Four corners of the palm ROI in frame pixels, mirroring palm.ambil_roi.
-// skala grows the box around the same centre (1.0 = journal box, from the server's ROI_SKALA).
+// Top and bottom edge of the box in palm widths below the finger-base line, mirroring
+// palm.batas_vertikal. 1.0 is the journal box (0.15 to 1.15). Smaller values shrink it evenly;
+// larger values widen it and raise the top edge (never above the line) but keep the bottom at 1.15, the wrist.
+export function batasVertikal(skala) {
+  if (skala <= 1) {
+    const tambah = 0.5 * (skala - 1);
+    return [0.15 - tambah, 1.15 + tambah];
+  }
+  return [Math.max(0, 0.15 - 0.5 * (skala - 1)), 1.15];
+}
+
+// skala is the box width in palm widths (1.0 = journal box, from the server's ROI_SKALA).
 // `didalam` is false when any corner leaves the frame.
 export function kotakRoi(lm, w, h, skala = 1) {
   const p5 = px(lm, 5, w, h);
@@ -69,9 +80,7 @@ export function kotakRoi(lm, w, h, skala = 1) {
   let n = { x: -u.y, y: u.x };
   if ((p0.x - c.x) * n.x + (p0.y - c.y) * n.y < 0) n = { x: -n.x, y: -n.y };
 
-  const tambah = 0.5 * (skala - 1);
-  const atas = 0.15 - tambah;
-  const bawah = 1.15 + tambah;
+  const [atas, bawah] = batasVertikal(skala);
   const titik = [];
   for (const [sign, k] of [[-1, atas], [1, atas], [1, bawah], [-1, bawah]]) {
     titik.push([

@@ -10,6 +10,7 @@ from dataclasses import dataclass
 import cv2
 import numpy as np
 
+import metode as metode_mod
 import palm
 from validation import (jari_terbuka, kualitas_roi, menghadap_kamera, silang_telapak,
                         sisi_dari_label, ukur_roi)
@@ -37,22 +38,23 @@ class Analisis:
     tahap: int = 1          # last step reached (1..7)
     gagal: str = None       # reason the photo was rejected, if any
     roi_skala: float = 1.0  # ROI box size relative to palm width
+    metode: str = "gabor"   # how the ROI becomes a pattern: "gabor" or "canny"
 
     @property
     def kode(self):
         return None if self.kode_detail is None else self.kode_detail["kode"]
 
 
-def analisis(frame_bgr, deteksi=palm.deteksi_tangan, roi_skala=1.0):
+def analisis(frame_bgr, deteksi=palm.deteksi_tangan, roi_skala=1.0, metode="gabor"):
     """Run steps 1-7 on one frame and log a one-line summary. `deteksi` is injectable for tests."""
-    a = _analisis(frame_bgr, deteksi, roi_skala)
+    a = _analisis(frame_bgr, deteksi, roi_skala, metode_mod.periksa(metode))
     _catat(a)
     return a
 
 
 def _catat(a):
     h, w = a.frame.shape[:2]
-    bagian = [f"frame={w}x{h}", f"roi_skala={a.roi_skala:g}", f"tahap={a.tahap}"]
+    bagian = [f"frame={w}x{h}", f"metode={a.metode}", f"roi_skala={a.roi_skala:g}", f"tahap={a.tahap}"]
     if a.lm is not None:
         bagian.append(f"label={a.label} sisi={a.sisi} silang={silang_telapak(a.lm, w, h):.0f}")
     if a.roi_detail is not None:
@@ -64,8 +66,8 @@ def _catat(a):
     log.info("analisis %s", " ".join(bagian))
 
 
-def _analisis(frame_bgr, deteksi, roi_skala):
-    a = Analisis(frame=frame_bgr, roi_skala=roi_skala)
+def _analisis(frame_bgr, deteksi, roi_skala, metode):
+    a = Analisis(frame=frame_bgr, roi_skala=roi_skala, metode=metode)
     hasil = deteksi(frame_bgr)
     if hasil is None:
         a.gagal = "Tangan tidak terdeteksi"
@@ -89,5 +91,5 @@ def _analisis(frame_bgr, deteksi, roi_skala):
     if a.gagal:
         return a
     a.tahap = 7
-    a.kode_detail = palm.hitung_kode_detail(a.roi_detail["roi"])
+    a.kode_detail = metode_mod.hitung_kode_detail(metode, a.roi_detail["roi"])
     return a

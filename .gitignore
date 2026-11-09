@@ -11,4 +11,6 @@ frontend/public/mediapipe/
 
 # Local data and agent scratch files
 registered_data/
+backend/data_uji/
+backend/gambar_canny/
 .superpowers

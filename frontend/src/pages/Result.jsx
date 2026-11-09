@@ -4,12 +4,12 @@ import { IkonCentang, IkonSilang, Kartu, tombol } from "../components/ui.jsx";
 
 const PIXELATED = new Set([4, 5, 6, 7]); // small maps: keep them sharp, not blurred
 
-function Langkah({ langkah, terakhir }) {
+function Langkah({ langkah, terakhir, skalaMaks }) {
   const kecil = PIXELATED.has(langkah.no);
   return (
     <li className="relative grid grid-cols-[2.5rem_1fr] gap-4">
       {/* The timeline rail joining one step to the next. */}
-      {!terakhir && <span className="absolute top-11 bottom-[-1.25rem] left-5 w-0.5 -translate-x-1/2 bg-line" aria-hidden="true" />}
+      {!terakhir && <span className="absolute top-11 -bottom-5 left-5 w-0.5 -translate-x-1/2 bg-line" aria-hidden="true" />}
       <span className="relative z-10 flex h-10 w-10 items-center justify-center rounded-full bg-brand text-sm font-bold text-white shadow-float">
         {langkah.no}
       </span>
@@ -18,7 +18,7 @@ function Langkah({ langkah, terakhir }) {
         <p className="mt-1 mb-4 text-sm text-muted">{langkah.penjelasan}</p>
 
         {langkah.no === 8 ? (
-          <DistanceChart jarak={langkah.jarak} batas={langkah.angka.batas} />
+          <DistanceChart jarak={langkah.jarak} batas={langkah.angka.batas} maks={skalaMaks} />
         ) : langkah.gambar.length > 1 ? (
           <div className={`grid gap-3 ${langkah.gambar.length === 2 ? "grid-cols-1 sm:grid-cols-2" : "grid-cols-3 sm:grid-cols-6"}`}>
             {langkah.gambar.map((g) => (
@@ -112,18 +112,21 @@ export default function Result() {
   const { state } = useLocation();
   if (!state?.hasil) return <Navigate to="/" replace />;
 
-  const { langkah, jarak, batas, hasil } = state.hasil;
+  const { langkah, jarak, batas, hasil, metode_nama: metodeNama, skala_maks: skalaMaks } = state.hasil;
   return (
     <div className="space-y-10">
       <KotakHasil hasil={hasil} batas={batas} jarak={jarak} />
       <section className="space-y-5">
         <div>
           <h2 className="text-2xl font-extrabold tracking-tight text-ink">Cara sistem sampai ke jawaban ini</h2>
-          <p className="mt-1 text-muted">Gambar di bawah adalah data asli dari setiap tahap pemrosesan foto tadi.</p>
+          <p className="mt-1 text-muted">
+            Gambar di bawah adalah data asli dari setiap tahap pemrosesan foto tadi.
+            {metodeNama && <> Metode pengenalan: <b className="font-semibold text-ink">{metodeNama}</b>.</>}
+          </p>
         </div>
         <ol className="space-y-5">
           {langkah.map((l, i) => (
-            <Langkah key={l.no} langkah={l} terakhir={i === langkah.length - 1} />
+            <Langkah key={l.no} langkah={l} terakhir={i === langkah.length - 1} skalaMaks={skalaMaks} />
           ))}
         </ol>
       </section>

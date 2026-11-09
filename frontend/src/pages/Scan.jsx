@@ -1,33 +1,51 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router";
 import PalmCamera from "../components/PalmCamera.jsx";
 import ProcessingPanel from "../components/ProcessingPanel.jsx";
 import { JudulHalaman, Pesan } from "../components/ui.jsx";
-import { scan } from "../lib/api.js";
+import { ambilPengaturan, scan } from "../lib/api.js";
 
-const BATAS_DEFAULT = 0.38;
+// Used until the server answers, and if it cannot be reached. These are the Gabor values the app started with.
+const CADANGAN = { metode: "gabor", metode_nama: "Gabor", batas_default: 0.38, batas_min: 0.1, batas_maks: 0.5 };
 
-function batasTersimpan() {
+// Each method has its own distance scale, so the remembered threshold is kept per method.
+function batasTersimpan(p) {
   try {
-    const v = Number(localStorage.getItem("batas"));
-    return v >= 0.1 && v <= 0.5 ? v : BATAS_DEFAULT;
+    const v = Number(localStorage.getItem(`batas_${p.metode}`));
+    return v >= p.batas_min && v <= p.batas_maks ? v : p.batas_default;
   } catch {
-    return BATAS_DEFAULT;
+    return p.batas_default;
   }
 }
 
 export default function Scan() {
   const navigate = useNavigate();
-  const [batas, setBatas] = useState(batasTersimpan);
+  const [pengaturan, setPengaturan] = useState(null);
+  const [batas, setBatas] = useState(null);
   const [memproses, setMemproses] = useState(false);
   const [foto, setFoto] = useState(null);
   const [galat, setGalat] = useState(null);
+
+  useEffect(() => {
+    ambilPengaturan()
+      .then((p) => {
+        setPengaturan(p);
+        setBatas(batasTersimpan(p));
+      })
+      .catch(() => {
+        setPengaturan(CADANGAN);
+        setBatas(CADANGAN.batas_default);
+      });
+  }, []);
+
+  const p = pengaturan ?? CADANGAN;
+  const nilai = batas ?? p.batas_default;
 
   function ubahBatas(e) {
     const v = Number(e.target.value);
     setBatas(v);
     try {
-      localStorage.setItem("batas", String(v));
+      localStorage.setItem(`batas_${p.metode}`, String(v));
     } catch {
       // private mode: the slider still works, it just will not be remembered
     }
@@ -38,7 +56,7 @@ export default function Scan() {
     setMemproses(true);
     setGalat(null);
     try {
-      const hasil = await scan(frame, batas);
+      const hasil = await scan(frame, nilai);
       navigate("/hasil", { state: { hasil } });
     } catch (err) {
       setGalat(err.message);
@@ -46,7 +64,7 @@ export default function Scan() {
     }
   }
 
-  const persen = ((batas - 0.1) / 0.4) * 100;
+  const persen = ((nilai - p.batas_min) / (p.batas_maks - p.batas_min)) * 100;
 
   return (
     <div className="space-y-8">
@@ -57,14 +75,14 @@ export default function Scan() {
         <label className="w-full max-w-xs rounded-2xl border border-white bg-white/80 p-4 text-sm shadow-card sm:w-72">
           <span className="flex items-baseline justify-between">
             <span className="font-semibold text-ink">Batas kecocokan</span>
-            <span className="text-base font-bold text-brand tabular-nums">{batas.toFixed(2)}</span>
+            <span className="text-base font-bold text-brand tabular-nums">{nilai.toFixed(2)}</span>
           </span>
           <input
             type="range"
-            min="0.1"
-            max="0.5"
+            min={p.batas_min}
+            max={p.batas_maks}
             step="0.01"
-            value={batas}
+            value={nilai}
             onChange={ubahBatas}
             className="mt-3 h-2 w-full cursor-pointer appearance-none rounded-full accent-brand"
             style={{ background: `linear-gradient(to right, #2f6bef ${persen}%, #e6e8fb ${persen}%)` }}
@@ -73,6 +91,7 @@ export default function Scan() {
             <span>Lebih ketat</span>
             <span>Lebih longgar</span>
           </span>
+          <span className="mt-2 block text-xs text-muted">Metode pengenalan: {p.metode_nama}</span>
         </label>
       </JudulHalaman>
 

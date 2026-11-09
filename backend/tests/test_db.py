@@ -95,6 +95,30 @@ def test_migrasi_kolom_skala(tmp_path):
     con.execute("INSERT INTO telapak VALUES (1, 1, 'kanan', ?, '2026-11-01 10:00:00')", (KODE.tobytes(),))
     con.commit(); con.close()
     engine = buat_engine(f"sqlite:///{path}")
-    assert "roi_skala" in [c["name"] for c in inspect(engine).get_columns("telapak")]
+    kolom = [c["name"] for c in inspect(engine).get_columns("telapak")]
+    assert "roi_skala" in kolom and "roi_bentuk" in kolom and "metode" in kolom
     with Session(engine) as sess:
-        assert muat_galeri(sess)[0]["roi_skala"] == 1.0
+        g = muat_galeri(sess)[0]
+        assert g["roi_skala"] == 1.0 and g["roi_bentuk"] == 1  # old rows count as the original box shape
+        assert g["metode"] == "gabor"  # and as Gabor, the only method that existed
+
+
+def test_bentuk_kotak_tersimpan_dan_diganti(s):
+    o = tambah_orang(s, "dewa", 21, "mahasiswa")
+    simpan_telapak(s, o.id, "kanan", KODE, roi_skala=1.3, roi_bentuk=2)
+    s.commit()
+    assert muat_galeri(s)[0]["roi_bentuk"] == 2
+    simpan_telapak(s, o.id, "kanan", KODE, ganti=True, roi_skala=1.0, roi_bentuk=1)
+    s.commit()
+    assert muat_galeri(s)[0]["roi_bentuk"] == 1
+
+
+def test_metode_tersimpan_dan_diganti(s):
+    o = tambah_orang(s, "dewa", 21, "mahasiswa")
+    simpan_telapak(s, o.id, "kanan", KODE)
+    s.commit()
+    assert muat_galeri(s)[0]["metode"] == "gabor"  # the default
+    simpan_telapak(s, o.id, "kanan", KODE, ganti=True, metode="canny")
+    s.commit()
+    assert muat_galeri(s)[0]["metode"] == "canny"
+    assert ambil_orang(s, o.id)["metode_tangan"] == {"kanan": "canny"}

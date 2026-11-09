@@ -24,11 +24,33 @@ def deteksi_tangan(frame_bgr):
     return hasil.multi_hand_landmarks[0].landmark, label
 
 
+def batas_vertikal(skala):
+    """Top and bottom edge of the ROI box, in palm widths below the line through both finger bases.
+
+    skala=1.0 is the journal box: a square from 0.15 to 1.15. Smaller values shrink it evenly.
+    Larger values keep the bottom edge at 1.15, which is about where the wrist starts, and
+    instead widen the box and raise its top edge toward the finger-base line (never above it).
+    """
+    if skala <= 1.0:
+        tambah = 0.5 * (skala - 1)
+        return 0.15 - tambah, 1.15 + tambah
+    return max(0.0, 0.15 - 0.5 * (skala - 1)), 1.15
+
+
+def versi_bentuk(skala):
+    """Codes can only be compared when they were cut with the same box shape.
+
+    Up to 1.0x the box is identical in every version (version 1). Above 1.0x, version 2 is the
+    box that stops at the wrist; version 1 grew evenly in every direction and ran past the wrist.
+    """
+    return 1 if skala <= 1.0 else 2
+
+
 def ambil_roi_detail(frame_bgr, lm, skala=1.0):
     """Cut the palm ROI and return the intermediate steps, or None if it does not fit.
 
-    skala=1.0 is the journal box (palm width square). A larger value grows the
-    box evenly around the same centre to include more of the palm.
+    skala is the box width in palm widths (1.0 = the journal box, a palm-width square).
+    See batas_vertikal() for how the height changes with it.
     """
     h, w = frame_bgr.shape[:2]
     p5 = np.array([lm[5].x * w, lm[5].y * h])    # index finger base
@@ -49,9 +71,9 @@ def ambil_roi_detail(frame_bgr, lm, skala=1.0):
     arah = 1 if p0r[1] > pusat[1] else -1  # is the wrist below or above the line?
 
     s = jarak  # palm width; the journal box is s x s
-    tambah = 0.5 * (skala - 1)  # 0.0 at skala=1.0, so the journal values stay exact
-    y_mulai = pusat[1] + arah * (0.15 - tambah) * s
-    y_akhir = pusat[1] + arah * (1.15 + tambah) * s
+    atas, bawah = batas_vertikal(skala)  # (0.15, 1.15) at skala=1.0, so the journal values stay exact
+    y_mulai = pusat[1] + arah * atas * s
+    y_akhir = pusat[1] + arah * bawah * s
     y1, y2 = int(min(y_mulai, y_akhir)), int(max(y_mulai, y_akhir))
     x1, x2 = int(pusat[0] - skala * s / 2), int(pusat[0] + skala * s / 2)
     if x1 < 0 or y1 < 0 or x2 > w or y2 > h:

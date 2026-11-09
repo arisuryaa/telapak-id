@@ -88,6 +88,25 @@ def test_kotak_asli_adalah_kotak_lurus_yang_diputar_balik():
     assert abs(p5r[1] - p17r[1]) < 0.5
 
 
+def test_metode_tidak_dikenal_ditolak():
+    import pytest
+    with pytest.raises(ValueError, match="METODE harus"):
+        analisis(frame_uji(), deteksi=lambda f: (lm("terbuka_kanan"), "Left"), metode="sobel")
+
+
+def test_analisis_canny_menghasilkan_peta_arah_dan_dicatat(caplog):
+    import logging
+    with caplog.at_level(logging.INFO, logger="telapak"):
+        a = analisis(frame_uji(), deteksi=lambda f: (lm("terbuka_kanan"), "Left"), metode="canny")
+    assert a.gagal is None and a.metode == "canny" and a.kode.shape == (128, 128)
+    assert a.kode.max() <= 6 and (a.kode > 0).any()
+    assert "metode=canny" in caplog.text
+    ls = susun_langkah(a, jarak=[], batas=0.75)
+    assert [l["no"] for l in ls] == [1, 2, 3, 4, 5, 6, 7, 8]
+    assert [l["judul"] for l in ls[5:7]] == ["Canny: blur dan gradien", "Tepi Canny dan arahnya"]
+    assert all(g["src"].startswith("data:image/") for l in ls for g in l["gambar"])
+
+
 def test_analisis_mencatat_log(caplog):
     import logging
     with caplog.at_level(logging.INFO, logger="telapak"):

@@ -56,6 +56,10 @@ class Telapak(Base):
     kode: Mapped[bytes] = mapped_column(LargeBinary().with_variant(mysql.LONGBLOB(), "mysql"))
     # ROI box size used for these codes; codes from different sizes cannot be compared
     roi_skala: Mapped[float] = mapped_column(Float, default=1.0, server_default=text("1.0"))
+    # shape version of the box (palm.versi_bentuk); the same roi_skala can mean different boxes in different versions
+    roi_bentuk: Mapped[int] = mapped_column(Integer, default=1, server_default=text("1"))
+    # how the ROI became this code (metode.py); codes from different methods cannot be compared
+    metode: Mapped[str] = mapped_column(String(10), default="gabor", server_default=text("'gabor'"))
     dibuat_pada: Mapped[datetime] = mapped_column(DateTime, default=_sekarang)
     orang: Mapped[Orang] = relationship(back_populates="telapak")
 
@@ -66,6 +70,12 @@ def _migrasi(engine):
     if "roi_skala" not in kolom:
         with engine.begin() as conn:
             conn.execute(text("ALTER TABLE telapak ADD COLUMN roi_skala FLOAT NOT NULL DEFAULT 1.0"))
+    if "roi_bentuk" not in kolom:
+        with engine.begin() as conn:
+            conn.execute(text("ALTER TABLE telapak ADD COLUMN roi_bentuk INT NOT NULL DEFAULT 1"))
+    if "metode" not in kolom:  # every hand enrolled before this column existed used Gabor
+        with engine.begin() as conn:
+            conn.execute(text("ALTER TABLE telapak ADD COLUMN metode VARCHAR(10) NOT NULL DEFAULT 'gabor'"))
 
 
 def _pesan_tidak_tersedia(url, err):
@@ -112,7 +122,7 @@ def tambah_orang(s, nama, umur, status):
     return o
 
 
-def simpan_telapak(s, orang_id, sisi, kode, ganti=False, roi_skala=1.0):
+def simpan_telapak(s, orang_id, sisi, kode, ganti=False, roi_skala=1.0, roi_bentuk=1, metode="gabor"):
     """Store the code set for one hand. Raises TelapakSudahAda unless `ganti` is True."""
     ada = s.scalar(select(Telapak).where(Telapak.orang_id == orang_id, Telapak.sisi == sisi))
     if ada is not None:
@@ -120,9 +130,12 @@ def simpan_telapak(s, orang_id, sisi, kode, ganti=False, roi_skala=1.0):
             raise TelapakSudahAda(sisi)
         ada.kode = kode_ke_bytes(kode)
         ada.roi_skala = roi_skala
+        ada.roi_bentuk = roi_bentuk
+        ada.metode = metode
         s.flush()
         return ada
-    t = Telapak(orang_id=orang_id, sisi=sisi, kode=kode_ke_bytes(kode), roi_skala=roi_skala)
+    t = Telapak(orang_id=orang_id, sisi=sisi, kode=kode_ke_bytes(kode), roi_skala=roi_skala,
+                roi_bentuk=roi_bentuk, metode=metode)
     s.add(t)
     s.flush()
     return t
@@ -133,7 +146,8 @@ def muat_galeri(s):
     rows = s.execute(select(Telapak, Orang).join(Telapak.orang)).all()
     return [{
         "telapak_id": t.id, "orang_id": o.id, "nama": o.nama,
-        "sisi": t.sisi, "kode": bytes_ke_kode(t.kode), "roi_skala": t.roi_skala,
+        "sisi": t.sisi, "kode": bytes_ke_kode(t.kode), "roi_skala": t.roi_skala, "roi_bentuk": t.roi_bentuk,
+        "metode": t.metode,
     } for t, o in rows]
 
 
@@ -142,6 +156,7 @@ def orang_ke_dict(o):
         "id": o.id, "nama": o.nama, "umur": o.umur, "status": o.status,
         "tangan": sorted(t.sisi for t in o.telapak),
         "skala_tangan": {t.sisi: t.roi_skala for t in o.telapak},
+        "metode_tangan": {t.sisi: t.metode for t in o.telapak},
         "dibuat_pada": o.dibuat_pada.isoformat(),
     }
 
