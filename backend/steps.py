@@ -41,6 +41,24 @@ def _gambar_landmark(frame, lm):
     return out
 
 
+_WARNA_GARIS = (0, 190, 255)  # BGR amber, the line between the two finger bases
+
+
+def _gambar_sebelum_diluruskan(frame, detail):
+    """The original photo with the ROI box and the finger-base line drawn where they really are.
+
+    The box is cut from the rotated photo, so its corners are mapped back through the
+    inverse of the rotation to show where that region sits on the photo before it was rotated.
+    """
+    x1, y1, x2, y2 = detail["kotak"]
+    pojok_lurus = np.array([[[x1, y1], [x2, y1], [x2, y2], [x1, y2]]], np.float32)
+    asli = cv2.transform(pojok_lurus, cv2.invertAffineTransform(detail["putar"]))[0]
+    out = frame.copy()
+    cv2.polylines(out, [np.round(asli).astype(np.int32)], True, (0, 255, 0), 3)
+    cv2.line(out, tuple(int(v) for v in detail["p5"]), tuple(int(v) for v in detail["p17"]), _WARNA_GARIS, 3)
+    return out
+
+
 def susun_langkah(a, jarak=None, batas=None):
     """Return the step cards for an analysis. Each card is ready for JSON.
 
@@ -64,18 +82,34 @@ def susun_langkah(a, jarak=None, batas=None):
         x1, y1, x2, y2 = a.roi_detail["kotak"]
         diluruskan = a.roi_detail["rot"].copy()
         cv2.rectangle(diluruskan, (x1, y1), (x2, y2), (0, 255, 0), 3)
+        sebelum = _gambar_sebelum_diluruskan(a.frame, a.roi_detail)
+        # the same ruler line (index base to little-finger base) on the rotated photo: now horizontal
+        M = a.roi_detail["putar"]
+        p5r = tuple(int(v) for v in M @ np.array([*a.roi_detail["p5"], 1.0]))
+        p17r = tuple(int(v) for v in M @ np.array([*a.roi_detail["p17"], 1.0]))
+        cv2.line(diluruskan, p5r, p17r, _WARNA_GARIS, 3)
         langkah.append({
             "no": 3, "judul": "Telapak diluruskan",
-            "penjelasan": "Gambar diputar agar garis pangkal jari mendatar, lalu kotak telapak diambil.",
-            "gambar": [{"label": "Diluruskan + kotak ROI", "src": ke_data_url(diluruskan, ".jpg")}],
+            "penjelasan": ("Foto diputar sampai garis pangkal jari (garis kuning, dari pangkal telunjuk ke pangkal "
+                           "kelingking) mendatar, lalu kotak telapak (hijau) dipotong dari foto yang sudah lurus. "
+                           "Gambar kiri menunjukkan di mana kotak itu berada pada foto asli."),
+            "gambar": [
+                {"label": "Sebelum diluruskan", "src": ke_data_url(sebelum, ".jpg")},
+                {"label": "Sesudah diluruskan", "src": ke_data_url(diluruskan, ".jpg")},
+            ],
             "angka": {"sudut putar": f"{a.roi_detail['sudut']:.1f}°",
                       "ukuran kotak": f"{a.roi_skala:g}× lebar telapak"},
         })
+        potongan = a.roi_detail["potongan"]
         langkah.append({
             "no": 4, "judul": "ROI abu-abu",
-            "penjelasan": "Area tengah telapak diubah menjadi abu-abu dan diperkecil ke 128×128.",
-            "gambar": [{"label": "ROI", "src": ke_data_url(a.roi_detail["roi"])}],
-            "angka": {"ukuran": "128×128"},
+            "penjelasan": ("Area tengah telapak dipotong dari foto yang sudah lurus (kiri, masih berwarna), "
+                           "diubah menjadi abu-abu, lalu diperkecil ke 128×128 (kanan)."),
+            "gambar": [
+                {"label": "Hasil potongan (berwarna)", "src": ke_data_url(potongan), "halus": True},
+                {"label": "Abu-abu 128×128", "src": ke_data_url(a.roi_detail["roi"])},
+            ],
+            "angka": {"ukuran potongan": f"{potongan.shape[1]}×{potongan.shape[0]}", "ukuran ROI": "128×128"},
         })
     if a.kode_detail is not None:
         clahe = a.kode_detail["clahe"]

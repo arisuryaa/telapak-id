@@ -58,6 +58,36 @@ def test_lengkap_tujuh_langkah_dan_kode_jujur():
     assert all(g["src"].startswith("data:image/") for l in ls for g in l["gambar"])
 
 
+def test_langkah_tiga_menampilkan_kotak_sebelum_dan_sesudah_diluruskan():
+    a = analisis(frame_uji(), deteksi=lambda f: (lm("terbuka_kanan"), "Left"))
+    langkah3 = susun_langkah(a)[2]
+    assert [g["label"] for g in langkah3["gambar"]] == ["Sebelum diluruskan", "Sesudah diluruskan"]
+    assert all(g["src"].startswith("data:image/jpeg") for g in langkah3["gambar"])
+
+
+def test_langkah_empat_menampilkan_potongan_berwarna_sebelum_abu_abu():
+    a = analisis(frame_uji(), deteksi=lambda f: (lm("terbuka_kanan"), "Left"))
+    langkah4 = susun_langkah(a)[3]
+    assert [g["label"] for g in langkah4["gambar"]] == ["Hasil potongan (berwarna)", "Abu-abu 128×128"]
+    x1, y1, x2, y2 = a.roi_detail["kotak"]
+    assert a.roi_detail["potongan"].shape == (y2 - y1, x2 - x1, 3)  # colour, same size as the box
+    assert a.roi_detail["roi"].shape == (128, 128)
+
+
+def test_kotak_asli_adalah_kotak_lurus_yang_diputar_balik():
+    a = analisis(frame_uji(), deteksi=lambda f: (lm("terbuka_kanan"), "Left"))
+    d = a.roi_detail
+    x1, y1, x2, y2 = d["kotak"]
+    pojok = np.array([[[x1, y1], [x2, y1], [x2, y2], [x1, y2]]], np.float32)
+    asli = cv2.transform(pojok, cv2.invertAffineTransform(d["putar"]))[0]
+    sisi = [float(np.linalg.norm(asli[i] - asli[(i + 1) % 4])) for i in range(4)]
+    # rotation keeps the box a rectangle of the same size
+    assert abs(sisi[0] - (x2 - x1)) < 1 and abs(sisi[1] - (y2 - y1)) < 1
+    # and the rotation maps the finger-base line onto a horizontal line
+    p5r, p17r = (d["putar"] @ np.array([*d["p5"], 1.0])), (d["putar"] @ np.array([*d["p17"], 1.0]))
+    assert abs(p5r[1] - p17r[1]) < 0.5
+
+
 def test_analisis_mencatat_log(caplog):
     import logging
     with caplog.at_level(logging.INFO, logger="telapak"):

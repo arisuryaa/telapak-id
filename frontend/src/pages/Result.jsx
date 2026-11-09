@@ -20,10 +20,10 @@ function Langkah({ langkah, terakhir }) {
         {langkah.no === 8 ? (
           <DistanceChart jarak={langkah.jarak} batas={langkah.angka.batas} />
         ) : langkah.gambar.length > 1 ? (
-          <div className="grid grid-cols-3 gap-3 sm:grid-cols-6">
+          <div className={`grid gap-3 ${langkah.gambar.length === 2 ? "grid-cols-1 sm:grid-cols-2" : "grid-cols-3 sm:grid-cols-6"}`}>
             {langkah.gambar.map((g) => (
               <figure key={g.label} className="text-center text-xs text-muted">
-                <img src={g.src} alt={g.label} className="w-full rounded-xl bg-lilac pixelated" />
+                <img src={g.src} alt={g.label} className={`w-full rounded-xl bg-lilac ${kecil && !g.halus ? "pixelated" : ""}`} />
                 <figcaption className="mt-1.5 font-medium">{g.label}</figcaption>
               </figure>
             ))}

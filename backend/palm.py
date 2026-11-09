@@ -56,15 +56,20 @@ def ambil_roi_detail(frame_bgr, lm, skala=1.0):
     x1, x2 = int(pusat[0] - skala * s / 2), int(pusat[0] + skala * s / 2)
     if x1 < 0 or y1 < 0 or x2 > w or y2 > h:
         return None  # box goes outside the image
-    roi = rot[y1:y2, x1:x2]
+    potongan = rot[y1:y2, x1:x2]
     if arah == -1:  # normalize orientation
-        roi = cv2.rotate(roi, cv2.ROTATE_180)
-    roi = cv2.cvtColor(roi, cv2.COLOR_BGR2GRAY)
+        potongan = cv2.rotate(potongan, cv2.ROTATE_180)
+    roi = cv2.cvtColor(potongan, cv2.COLOR_BGR2GRAY)
     return {
         "rot": rot,
         "kotak": (x1, y1, x2, y2),
         "sudut": float(sudut),
+        "potongan": potongan.copy(),  # the colour crop, before grey and the resize to 128x128
         "roi": cv2.resize(roi, (UKURAN, UKURAN)),
+        # kept so the results page can draw the same box on the photo before it was rotated
+        "putar": M,
+        "p5": p5,
+        "p17": p17,
     }
 
 
